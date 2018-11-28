@@ -19,7 +19,6 @@ class Critic(object):
         action_tensor = torch.tensor([action], dtype=torch.float64)
 
         x = F.relu(torch.from_numpy(np.dot(state_biased, self.weights1)))
-        #x = np.append(-1, x, action)
         x = torch.cat((bias_tensor, x, action_tensor))
         x = F.relu(torch.from_numpy(np.dot(x.numpy(), self.weights2)))
         x = torch.cat((bias_tensor, x))
@@ -30,4 +29,3 @@ class Critic(object):
 spasti = gym.make('CartPole-v0')
 hurensohn = Critic(spasti.observation_space.shape[0], 1)
 print(hurensohn.forward(spasti.reset(), 0))
-#print(hurensohn.forward(spasti.reset(), 1))
