@@ -24,7 +24,7 @@ class Critic(object):
         x = F.relu(torch.from_numpy(np.dot(x.numpy(), self.weights2)))
         x = torch.cat((bias_tensor, x))
         x = torch.tanh(torch.from_numpy(np.dot(x.numpy(), self.weightsOutput)))
-        return x
+        return x.numpy()
 
 
 spasti = gym.make('CartPole-v0')
