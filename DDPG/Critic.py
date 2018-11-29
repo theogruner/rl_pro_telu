@@ -44,7 +44,7 @@ class Critic(object):
         x = torch.cat((bias_tensor, x, action_tensor))
         x = F.relu(torch.mv(self.weights2, x))
         x = torch.cat((bias_tensor, x))
-        x = torch.tanh(torch.mv(self.weightsOutput, x))
+        x = torch.relu(torch.mv(self.weightsOutput, x))
         return x
         # return x.detach().numpy()
 
