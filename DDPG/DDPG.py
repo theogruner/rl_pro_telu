@@ -4,7 +4,7 @@ import numpy as np
 import gym
 
 from buffer import ReplayBuffer
-from Critic import Critic
+from critic import Critic
 from Actor_policy import ActorPolicy
 from Ornstein_uhlenbeck_noise import OrnsteinUhlenbeck
 
