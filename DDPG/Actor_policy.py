@@ -6,7 +6,8 @@ import gym
 LAYER_1 = 400
 LAYER_2 = 300
 
-class Actor_policy(object):
+
+class ActorPolicy(object):
     def __init__(self, state_shape, action_shape):
         self.weights1 = np.random.rand(LAYER_1, state_shape + 1)
         self.weights2 = np.random.rand(LAYER_2, LAYER_1 + 1)

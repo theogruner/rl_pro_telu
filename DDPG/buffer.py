@@ -1,24 +1,7 @@
-import gym
-import quanser_robots
-import math
 import random
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
 from collections import namedtuple
-from itertools import count
-from PIL import Image
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-import torchvision.transforms as T
-
-
-env = gym.make('Levitation-v0')
-
-Transition = namedtuple('Transition', ('state', 'action', 'nextState', 'reward'))
+Transition = namedtuple('Transition', ('state', 'action', 'reward', 'nextState'))
 
 
 class ReplayBuffer(object):
