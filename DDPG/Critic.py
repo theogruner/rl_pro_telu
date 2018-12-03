@@ -3,8 +3,8 @@ import torch
 import numpy as np
 import gym
 
-LAYER_1 = 300
-LAYER_2 = 400
+LAYER_1 = 400
+LAYER_2 = 300
 
 class Critic(object):
 
@@ -36,9 +36,8 @@ class Critic(object):
         # x = torch.tanh(torch.from_numpy(np.dot(x.numpy(), self.weightsOutput)))
         # return x.numpy()
 
-        one = torch.tensor([-1], dtype=torch.float64)
-        state_biased = torch.cat((one, torch.from_numpy(state)))
         bias_tensor = torch.tensor([-1], dtype=torch.float64)
+        state_biased = torch.cat((bias_tensor, torch.from_numpy(state)))
         action_tensor = torch.tensor([action], dtype=torch.float64)
         x = F.relu(torch.mv(self.weights1, state_biased))
         x = torch.cat((bias_tensor, x, action_tensor))

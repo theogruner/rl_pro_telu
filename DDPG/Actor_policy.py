@@ -3,13 +3,13 @@ import torch
 import numpy as np
 import gym
 
-LAYER_1 = 300
-LAYER_2 = 400
+LAYER_1 = 400
+LAYER_2 = 300
 
 class Actor_policy(object):
     def __init__(self, state_shape, action_shape):
         self.weights1 = np.random.rand(LAYER_1, state_shape + 1)
-        self.weights2 = np.random.rand(LAYER_2, action_shape + LAYER_1 + 1)
+        self.weights2 = np.random.rand(LAYER_2, LAYER_1 + 1)
         self.weightsOutput = np.random.rand(action_shape, LAYER_2 + 1)
 
         self.weights1 = torch.from_numpy(self.weights1)
@@ -20,10 +20,8 @@ class Actor_policy(object):
         self.weightsOutput.requires_grad = True
 
     def forward(self, state):
-        one = torch.tensor([-1], dtype=torch.float64)
-        state_biased = torch.cat((one, torch.from_numpy(state)))
         bias_tensor = torch.tensor([-1], dtype=torch.float64)
-        action_tensor = torch.tensor([action], dtype=torch.float64)
+        state_biased = torch.cat((bias_tensor, torch.from_numpy(state)))
         x = F.relu(torch.mv(self.weights1, state_biased))
         x = torch.cat((bias_tensor, x))
         x = F.relu(torch.mv(self.weights2, x))
