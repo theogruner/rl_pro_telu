@@ -9,7 +9,7 @@ LAYER_2 = 300
 
 class Critic(object):
 
-    def __init__(self, state_shape, action_shape):
+    def __init__(self, state_shape, action_shape, requires_grad):
         self.weights1 = np.random.rand(LAYER_1, state_shape + 1)
         self.weights2 = np.random.rand(LAYER_2, action_shape + LAYER_1 + 1)
         self.weightsOutput = np.random.rand(1, LAYER_2 + 1)
@@ -17,9 +17,9 @@ class Critic(object):
         self.weights1 = torch.from_numpy(self.weights1)
         self.weights2 = torch.from_numpy(self.weights2)
         self.weightsOutput = torch.from_numpy(self.weightsOutput)
-        self.weights1.requires_grad = True
-        self.weights2.requires_grad = True
-        self.weightsOutput.requires_grad = True
+        self.weights1.requires_grad = requires_grad
+        self.weights2.requires_grad = requires_grad
+        self.weightsOutput.requires_grad = requires_grad
         # self.weights1 = torch.normal(mean=0.5, std=torch.arange(state_shape + 1, LAYER_1))
         # self.weights2 = torch.normal(mean=0.5, std=torch.arange(action_shape + LAYER_1 + 1, LAYER_1))
         # self.weightsOutput = torch.normal(mean=0.5, std=torch.arange(LAYER_2 + 1, 1))
