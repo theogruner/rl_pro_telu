@@ -1,6 +1,5 @@
 import torch.nn.functional as F
 import torch.nn as nn
-import torch
 
 LAYER_1 = 400
 LAYER_2 = 300
