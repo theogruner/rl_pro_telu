@@ -121,6 +121,7 @@ TAU = 0.001
 M = 1e3
 #epsiode length
 T = 42
+ddpg_torch(env)
 
 def ddpg_torch(env):
     state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
