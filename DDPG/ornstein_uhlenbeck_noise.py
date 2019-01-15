@@ -3,10 +3,10 @@ import numpy as np
 
 class OrnsteinUhlenbeck(object):
 
-    def __init__(self,x_start, theta, mu, sigma, delta_t):
+    def __init__(self,x_start, theta, mu, sigma, delta_t,action_shape):
         self.x = x_start
         self.theta = theta
-        self.mu = mu
+        self.mu = mu*np.ones(action_shape)
         self.sigma = sigma
         self.delta_t = delta_t
 

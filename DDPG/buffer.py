@@ -14,7 +14,7 @@ class ReplayBuffer(object):
     def push(self, *args):
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
-        self.buffer[self.position] = Transition(*args)
+        self.buffer[int(self.position)] = Transition(*args)
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):

@@ -17,10 +17,15 @@ class Critic(nn.Module):
         self.lin3 = nn.Linear(LAYER_2, 1, True)
 
     def forward(self, state, action):
+        action = torch.tensor([action])
         x = F.relu(self.lin1(state))
-        x = F.relu(self.lin2(torch.cat((x, torch.from_numpy(action)),0)))
+        x = F.relu(self.lin2(torch.cat((x, action),0)))
         x = F.relu(self.lin3(x))
         return x
 
 critic = Critic(1,1)
-a = critic.forward(0.2,np.array([0.4]))
+# b = np.array([1,2,4])
+# c = torch.tensor([2,4,4,5])
+# print(torch.cat((torch.from_numpy(b),c),0))
+a = critic.forward(0.2,0.4)
+# a = critic.forward(torch.tensor([0.2]),torch.tensor(np.array([0.4])))
