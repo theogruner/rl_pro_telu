@@ -4,6 +4,7 @@ import torch.nn as nn
 import numpy as np
 import gym
 import quanser_robots
+import copy
 
 from buffer import ReplayBuffer
 from ornstein_uhlenbeck_noise import OrnsteinUhlenbeck
@@ -24,7 +25,7 @@ TAU = 0.001
 #episodes
 M = int(1e3)
 #epsiode length
-T = 42
+T = 50
 
 def ddpg_torch(env):
     state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
@@ -44,12 +45,13 @@ def ddpg_torch(env):
     target_critic = Critic(state_shape=state_shape, action_shape=action_shape)
     target_actor = Actor(state_shape=state_shape, action_shape=action_shape)
 
-    target_actor.load_state_dict(actor.state_dict())
-    target_critic.load_state_dict(critic.state_dict())
-    for param in target_actor.parameters():
-        param.requires_grad = False
-    for param in target_critic.parameters():
-        param.requires_grad = False
+    for target_param, param in zip(target_critic.parameters(), critic.parameters()):
+        target_param.data.copy_(param.data)
+        target_param.requires_grad = False
+
+    for target_param, param in zip(target_actor.parameters(), actor.parameters()):
+        target_param.data.copy_(param.data)
+        target_param.requires_grad = False
 
     observation = env.reset()
     for i in range(0, BATCH_SIZE):
