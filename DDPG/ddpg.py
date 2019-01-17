@@ -25,23 +25,26 @@ TAU = 0.001
 #episodes
 M = int(1e3)
 #epsiode length
-T = 50
+T = 100
 
 def ddpg_torch(env):
     state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
     action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
 
-    # initalize buffer
+    # initialize buffer
     buffer = ReplayBuffer(CAPACITY)
-    # initalize actor
+    # initialize actor
     actor = Actor(state_shape=state_shape, action_shape=action_shape)
-    # initilize actor optimizer
+    # initialize actor optimizer
     actor_optimizer = torch.optim.Adam(actor.parameters(), lr=1e-3)
-    # initalize critic
+    # initialize critic
     critic = Critic(state_shape= state_shape, action_shape=action_shape)
-    # initilize critic optimizer
+    # initialize critic optimizer
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
 
+    ###############################################
+    # initialize target networks and copying params
+    ###############################################
     target_critic = Critic(state_shape=state_shape, action_shape=action_shape)
     target_actor = Actor(state_shape=state_shape, action_shape=action_shape)
 
@@ -71,11 +74,11 @@ def ddpg_torch(env):
             action = actor.forward(torch.from_numpy(observation)).detach().numpy() + noise.x
             noise.iteration()
             #TODO action space auf output aufteilen
-            action = action * 3
+            action = action * 5
             new_observation, reward, done, _= env.step(action)
             env.render()
+            print(observation, new_observation, reward, done)
 
-            buffer.push(observation, action, reward, new_observation)
             observation = new_observation
 
             batch = buffer.sample(BATCH_SIZE)
@@ -108,6 +111,7 @@ def ddpg_torch(env):
 
             for target_param, param in zip(target_actor.parameters(), actor.parameters()):
                 target_param.data.copy_(target_param.data * (1.0 - TAU) + param.data * TAU)
+
 
 
 ddpg_torch(env)
