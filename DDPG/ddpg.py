@@ -25,7 +25,7 @@ TAU = 0.001
 #episodes
 M = int(1e3)
 #epsiode length
-T = 100
+T = 150
 
 def ddpg_torch(env):
     state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
@@ -75,10 +75,14 @@ def ddpg_torch(env):
             noise.iteration()
             #TODO action space auf output aufteilen
             action = action * 5
-            new_observation, reward, done, _= env.step(action)
+            new_observation, reward, done, _ = env.step(action)
             env.render()
-            print(observation, new_observation, reward, done)
 
+            #print(torch.from_numpy(observation).float())
+            #print(torch.tensor(action).float())
+            #print(critic.forward(torch.from_numpy(observation).float(), torch.tensor(env.action_space.sample()).float()))
+
+            buffer.push(observation, action, reward, new_observation)
             observation = new_observation
 
             batch = buffer.sample(BATCH_SIZE)
@@ -89,8 +93,9 @@ def ddpg_torch(env):
             i = 0
             for sample in batch:
                 y[i] = sample.reward + GAMMA * target_critic.forward(torch.from_numpy(sample.nextState), target_actor.forward(torch.from_numpy(sample.nextState)))
-                target[i] = critic.forward(torch.from_numpy(sample.state).float(), torch.from_numpy(sample.action).float())
+                target[i] = critic.forward(torch.from_numpy(sample.state).float(), torch.tensor(sample.action).float())
                 i = i + 1
+
             critic_optimizer.zero_grad()
             loss_critic = F.mse_loss(y, target)
             loss_critic.backward()
