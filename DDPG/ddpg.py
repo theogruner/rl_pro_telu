@@ -15,6 +15,9 @@ from actor_torch import Actor
 # env = gym.make('BallBalancerSim-v0')
 env = gym.make('Qube-v0')
 
+
+MSE = nn.MSELoss()
+
 # Hyperparameters
 X_START, THETA, MU, SIGMA, DELTA_T = 0, 0.15, 0, 0.2, 1e-2
 CAPACITY = 1e6
@@ -25,7 +28,7 @@ TAU = 0.001
 #episodes
 M = int(1e3)
 #epsiode length
-T = 100
+T = 200
 
 def ddpg_torch(env):
     state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
@@ -38,7 +41,7 @@ def ddpg_torch(env):
     # initialize actor optimizer
     actor_optimizer = torch.optim.Adam(actor.parameters(), lr=1e-3)
     # initialize critic
-    critic = Critic(state_shape= state_shape, action_shape=action_shape)
+    critic = Critic(state_shape=state_shape, action_shape=action_shape)
     # initialize critic optimizer
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
 
@@ -71,34 +74,45 @@ def ddpg_torch(env):
         observation = env.reset()
 
         for t in range(1, T+1):
-            action = actor.forward(torch.from_numpy(observation)).detach().numpy() + noise.x
+            action = actor.forward(torch.tensor(observation)).detach().numpy() + noise.x
             noise.iteration()
             #TODO action space auf output aufteilen
             action = action * 5
-            new_observation, reward, done, _= env.step(action)
+            action = action.astype(np.float32)
+            new_observation, reward, done, _ = env.step(action)
             env.render()
-            print(observation, new_observation, reward, done)
 
+            #print(actor([torch.tensor(observation).float(), torch.tensor(env.reset()).float()]))
+            #print(action)
+            #print(critic.forward(torch.from_numpy(observation).float(), torch.tensor(env.action_space.sample()).float()))
+
+            buffer.push(observation, action, reward, new_observation)
             observation = new_observation
 
-            batch = buffer.sample(BATCH_SIZE)
+            sample = buffer.sample(BATCH_SIZE)
+            state_batch, action_batch, reward_batch, next_state_batch = buffer.batches_from_sample(sample, BATCH_SIZE)
+
+            print(critic(torch.from_numpy(state_batch).float(), torch.from_numpy(action_batch).float()))
+            #print(actor(torch.from_numpy(state_batch)).float())
 
             # update critic
-            y = torch.zeros([BATCH_SIZE],dtype = torch.double)
-            target = torch.zeros([BATCH_SIZE], dtype = torch.double)
-            i = 0
-            for sample in batch:
-                y[i] = sample.reward + GAMMA * target_critic.forward(torch.from_numpy(sample.nextState), target_actor.forward(torch.from_numpy(sample.nextState)))
-                target[i] = critic.forward(torch.from_numpy(sample.state).float(), torch.from_numpy(sample.action).float())
-                i = i + 1
             critic_optimizer.zero_grad()
-            loss_critic = F.mse_loss(y, target)
+            #y = torch.zeros(BATCH_SIZE, dtype=torch.float)
+            #target = torch.zeros(BATCH_SIZE, dtype=torch.float)
+            #i = 0
+            #for sample in batch:
+            #    y[i] = sample.reward + GAMMA * target_critic.forward(torch.tensor(sample.nextState).float(), target_actor.forward(torch.tensor(sample.nextState).float()).float())
+            #    target[i] = criticc.forward(torch.tensor(sample.state).float(), torch.tensor(sample.action).float())
+            #    i = i + 1
+            loss_critic = MSE(y, target)
+            #loss_critic = F.mse_loss(y, target)
             loss_critic.backward()
             critic_optimizer.step()
 
 
             #update actor
-            loss_actor = torch.zeros([1],dtype = torch.float, requires_grad = True)
+            actor_optimizer.zero_grad()
+            loss_actor = torch.zeros(1, dtype=torch.float, requires_grad = True)
             for sample in batch:
                 loss_actor = loss_actor + critic.forward(torch.from_numpy(sample.state).float(),actor.forward(torch.from_numpy(sample.state)).float())
             loss_actor = loss_actor/len(batch)

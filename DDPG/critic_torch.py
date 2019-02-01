@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch
 
 import gym
+import quanser_robots
 import numpy as np
 
 LAYER_1 = 400
@@ -19,24 +20,18 @@ class Critic(nn.Module):
 
     def forward(self, state, action):
         x = F.relu(self.lin1(state))
-        x = F.relu(self.lin2(torch.cat((x, action))))
+        x = F.relu(self.lin2(torch.cat((x, action), 1)))
         x = F.relu(self.lin3(x))
         return x
 
-# env = gym.make('CartPole-v0')
-# observation_space = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
-# action_space = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
-# print(observation_space, action_space)
-# critic = Critic(observation_space, action_space)
-# env.reset()
-# state = torch.from_numpy(env.reset())
-# print(state)
-# action = torch.tensor(np.array([env.action_space.sample()]))
-# print(action.dtype)
-# action = np.array([1])
-# action = torch.from_numpy(action).float()
-# print(type(action))
-# type(action)
-# critic.forward(torch.from_numpy(env.reset()).float(),action)
-# print(critic.forward(state, action))
-
+#env = gym.make('Qube-v0')
+#observation_space = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
+#action_space = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
+#print(observation_space, action_space)
+#critic = Critic(observation_space, action_space)
+#for i in range(0, 500):
+    #state = torch.from_numpy(env.reset())
+    #print(state.dtype)
+    #action = torch.from_numpy(env.action_space.sample())
+    #print(env.action_space.sample())
+    #print(critic.forward(state.float(), action.float()).data[0])
