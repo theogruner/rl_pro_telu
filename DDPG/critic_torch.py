@@ -20,7 +20,7 @@ class Critic(nn.Module):
 
     def forward(self, state, action):
         x = F.relu(self.lin1(state))
-        x = F.relu(self.lin2(torch.cat((x, action))))
+        x = F.relu(self.lin2(torch.cat((x, action), 1)))
         x = F.relu(self.lin3(x))
         return x
 
@@ -29,10 +29,9 @@ class Critic(nn.Module):
 #action_space = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
 #print(observation_space, action_space)
 #critic = Critic(observation_space, action_space)
-#for i in range(0, 20):
-#    state = torch.from_numpy(env.reset())
-#    print(state)
-#    action = torch.tensor(env.action_space.sample())
-#    print(action)
-#    print(critic.forward(state.float(), action.float()))
-
+#for i in range(0, 500):
+    #state = torch.from_numpy(env.reset())
+    #print(state.dtype)
+    #action = torch.from_numpy(env.action_space.sample())
+    #print(env.action_space.sample())
+    #print(critic.forward(state.float(), action.float()).data[0])
