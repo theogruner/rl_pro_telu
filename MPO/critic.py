@@ -10,17 +10,19 @@ LAYER_2 = 200
 
 class Critic(nn.Module):
 
-    def __init__(self, state_shape, action_shape):
+    def __init__(self, env):
         super(Critic, self).__init__()
-        self.lin1 = nn.Linear(state_shape, LAYER_1, True)
-        self.lin2 = nn.Linear(LAYER_1 + action_shape, LAYER_2, True)
+        self.state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
+        self.action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
+        self.lin1 = nn.Linear(self.state_shape, LAYER_1, True)
+        self.lin2 = nn.Linear(LAYER_1 + self.action_shape, LAYER_2, True)
         self.lin3 = nn.Linear(LAYER_2, 1, True)
 
     def forward(self, state, action):
         action = torch.tensor([action])
         x = F.relu(self.lin1(state))
         x = F.relu(self.lin2(torch.cat((x, action),0)))
-        x = F.relu(self.lin3(x))
+        x = self.lin3(x)
         return x
 
 critic = Critic(1,1)
