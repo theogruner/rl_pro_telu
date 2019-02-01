@@ -21,7 +21,7 @@ class Critic(nn.Module):
     def forward(self, state, action):
         x = F.relu(self.lin1(state))
         x = F.relu(self.lin2(torch.cat((x, action), 1)))
-        x = F.relu(self.lin3(x))
+        x = self.lin3(x)
         return x
 
 #env = gym.make('Qube-v0')
