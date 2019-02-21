@@ -2,6 +2,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch.tensor
 import torch
+import gym
 import numpy as np
 
 LAYER_1 = 200
@@ -25,9 +26,9 @@ class Critic(nn.Module):
         x = self.lin3(x)
         return x
 
-critic = Critic(1,1)
-# b = np.array([1,2,4])
-# c = torch.tensor([2,4,4,5])
-# print(torch.cat((torch.from_numpy(b),c),0))
-a = critic.forward(0.2,0.4)
-# a = critic.forward(torch.tensor([0.2]),torch.tensor(np.array([0.4])))
+# critic = Critic(1,1)
+# # b = np.array([1,2,4])
+# # c = torch.tensor([2,4,4,5])
+# # print(torch.cat((torch.from_numpy(b),c),0))
+# a = critic.forward(0.2,0.4)
+# # a = critic.forward(torch.tensor([0.2]),torch.tensor(np.array([0.4])))
