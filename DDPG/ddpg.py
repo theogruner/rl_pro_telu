@@ -13,6 +13,7 @@ from actor_torch import Actor
 
 # Environment
 # env = gym.make('BallBalancerSim-v0')
+# env = gym.make('Pendulum-v0')
 env = gym.make('Qube-v0')
 
 # optimization problem
@@ -28,12 +29,12 @@ TAU = 0.001
 #episodes
 M = int(1e3)
 #epsiode length
-T = 200
+T = 100
 
 def ddpg_torch(env):
     state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
     action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
-
+    action_range = env.action_space.high[0]
     # initialize buffer
     buffer = ReplayBuffer(CAPACITY)
     # initialize actor
@@ -74,41 +75,32 @@ def ddpg_torch(env):
         observation = env.reset()
 
         for t in range(1, T+1):
-            action = actor.forward(torch.tensor(observation)).detach().numpy() + noise.x
+            action = actor.forward(torch.tensor(observation).float()).detach().numpy() + noise.x
             noise.iteration()
             #TODO action space auf output aufteilen
-            action = action * 5
-            action = np.clip(action, a_min=-5, a_max=5)
-            action = action.astype(np.float32)
+            action = action * action_range
+            action = np.clip(action, a_min=-action_range, a_max=action_range)
+            #action = action.astype(np.float32)
+            #print(action)
             new_observation, reward, done, _ = env.step(action)
             env.render()
-
-            #print(actor([torch.tensor(observation).float(), torch.tensor(env.reset()).float()]))
-            #print(action)
-            #print(critic.forward(torch.from_numpy(observation).float(), torch.tensor(env.action_space.sample()).float()))
 
             buffer.push(observation, action, reward, new_observation)
             observation = new_observation
 
             sample = buffer.sample(BATCH_SIZE)
             state_batch, action_batch, reward_batch, next_state_batch = buffer.batches_from_sample(sample, BATCH_SIZE)
+            state_batch, action_batch, reward_batch, next_state_batch = torch.tensor(state_batch).float(), torch.tensor(action_batch).float(), torch.tensor(reward_batch).float(), torch.tensor(next_state_batch).float()
 
-            #print(critic(torch.from_numpy(state_batch).float(), torch.from_numpy(action_batch).float()))
-            #print(actor(torch.from_numpy(state_batch)).float())
 
-            y = reward_batch + GAMMA * target_critic(torch.from_numpy(next_state_batch).float(), target_actor(torch.from_numpy(next_state_batch).float()))
+            #y = reward_batch + GAMMA * target_critic(torch.from_numpy(next_state_batch).float(), target_actor(torch.from_numpy(next_state_batch).float()))
+            y = reward_batch + GAMMA * target_critic(next_state_batch,
+                                                     target_actor(next_state_batch))
             # update critic
             critic_optimizer.zero_grad()
-            #y = torch.zeros(BATCH_SIZE, dtype=torch.float)
-            #target = torch.zeros(BATCH_SIZE, dtype=torch.float)
-            #i = 0
-            #for sample in batch:
-            #    y[i] = sample.reward + GAMMA * target_critic.forward(torch.tensor(sample.nextState).float(), target_actor.forward(torch.tensor(sample.nextState).float()).float())
-            #    target[i] = critic.forward(torch.tensor(sample.state).float(), torch.tensor(sample.action).float())
-            #    i = i + 1
-            target = critic(torch.from_numpy(state_batch).float(), torch.from_numpy(action_batch).float())
+            #target = critic(torch.from_numpy(state_batch).float(), torch.from_numpy(action_batch).float())
+            target = critic(state_batch, action_batch)
             loss_critic = MSE(y, target)
-            #loss_critic = F.mse_loss(y, target)
             loss_critic.backward()
             critic_optimizer.step()
 
@@ -118,8 +110,9 @@ def ddpg_torch(env):
             #loss_actor = torch.zeros(1, dtype=torch.float, requires_grad = True)
             #for sample in batch:
             #    loss_actor = loss_actor + critic.forward(torch.from_numpy(sample.state).float(),actor.forward(torch.from_numpy(sample.state)).float())
-            loss_actor = critic(torch.from_numpy(state_batch).float(), actor(torch.from_numpy(state_batch).float()))
-            loss_actor = loss_actor.mean()#/len(batch)
+            #loss_actor = critic(torch.from_numpy(state_batch).float(), actor(torch.from_numpy(state_batch).float()))
+            loss_actor = critic(state_batch, actor(state_batch))
+            loss_actor = -loss_actor.mean()#/len(batch)
             loss_actor.backward()
             actor_optimizer.step()
 
