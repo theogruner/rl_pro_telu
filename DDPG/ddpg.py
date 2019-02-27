@@ -27,9 +27,9 @@ GAMMA = 0.99
 TAU = 0.001
 
 #episodes
-M = int(1e3)
+M = int(1e4)
 #epsiode length
-T = 100
+T = 50
 
 def ddpg_torch(env):
     state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
