@@ -13,6 +13,9 @@ class OrnsteinUhlenbeck(object):
     def iteration(self):
         self.x = self.x + self.theta*(self.mu - self.x)*self.delta_t + self.sigma * self.wiener_process()
 
+    def reset(self):
+        self.x = 0
+
     def wiener_process(self):
         x_wiener = np.sqrt(self.delta_t)* np.random.normal(size = self.mu.shape)
         return x_wiener

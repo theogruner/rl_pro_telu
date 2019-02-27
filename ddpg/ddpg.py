@@ -1,13 +1,11 @@
-import torch.nn.functional as F
 import torch
 import torch.nn as nn
 import numpy as np
 import gym
 import quanser_robots
-import copy
 
 from buffer import ReplayBuffer
-from ornstein_uhlenbeck_noise import OrnsteinUhlenbeck
+from noise import OrnsteinUhlenbeck
 from critic_torch import Critic
 from actor_torch import Actor
 
@@ -45,6 +43,9 @@ def ddpg_torch(env):
     critic = Critic(state_shape=state_shape, action_shape=action_shape)
     # initialize critic optimizer
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
+    # initialize random Process
+    noise = OrnsteinUhlenbeck(X_START, THETA, MU, SIGMA, DELTA_T,
+                              action_shape=action_shape)
 
     ###############################################
     # initialize target networks and copying params
@@ -71,7 +72,7 @@ def ddpg_torch(env):
             observation = env.reset()
 
     for episode in range(0, M):
-        noise = OrnsteinUhlenbeck(X_START, THETA, MU, SIGMA, DELTA_T,action_shape = action_shape)
+        noise.reset()
         observation = env.reset()
 
         for t in range(1, T+1):
