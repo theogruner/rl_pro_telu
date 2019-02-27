@@ -1,3 +1,4 @@
+import os
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
@@ -14,91 +15,26 @@ from buffer import ReplayBuffer
 # optimization problem
 MSE = nn.MSELoss()
 
-LAYER_1 = 100
-LAYER_2 = 100
-
-
-class Critic(nn.Module):
-
-    def __init__(self, env):
-        super(Critic, self).__init__()
-        self.state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
-        self.action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
-        self.lin1 = nn.Linear(self.state_shape, LAYER_1, True)
-        self.lin2 = nn.Linear(LAYER_1 + self.action_shape, LAYER_2, True)
-        self.lin3 = nn.Linear(LAYER_2, 1, True)
-
-    def forward(self, state, action):
-        x = F.relu(self.lin1(state))
-        x = F.relu(self.lin2(torch.cat((x, action), 1)))
-        x = self.lin3(x)
-        return x
-
-
-class Actor(nn.Module):
-    def __init__(self, env):
-        super(Actor, self).__init__()
-        self.state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
-        self.action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
-        self.action_range = torch.from_numpy(env.action_space.high)
-        self.lin1 = nn.Linear(self.state_shape, LAYER_1, True)
-        self.lin2 = nn.Linear(LAYER_1, LAYER_2, True)
-        self.mean_layer = nn.Linear(LAYER_2, self.action_shape, True)
-        self.cholesky_layer = nn.Linear(LAYER_2, int((self.action_shape*self.action_shape + self.action_shape)/2), True)
-        self.cholesky = torch.zeros(self.action_shape,self.action_shape)
-
-    def forward(self, states):
-        x = F.relu(self.lin1(states))
-        x = F.relu(self.lin2(x))
-        mean = self.action_range * torch.tanh(self.mean_layer(x))
-        cholesky_vector = F.softplus(self.cholesky_layer(x))
-        # Turn into cholesky matrix
-        # if self.action_shape == 1:
-        #     return mean, cholesky_vector
-        cholesky = []
-        if cholesky_vector.dim() == 1 and cholesky_vector.shape[0] > 1:
-            cholesky.append(self.to_cholesky_matrix(cholesky_vector))
-        else:
-            for a in cholesky_vector:
-                cholesky.append(self.to_cholesky_matrix(a))
-        # cholesky = torch.stack([self.to_cholesky_matrix(a for a in cholesky_vector)])
-        return mean, torch.stack(cholesky)
-
-    def action(self, observation):
-        mean, cholesky = self.forward(observation)
-        # if self.action_shape == 1:
-            #     action_distribution = Normal(mean, cholesky)
-            # else:
-        action_distribution = MultivariateNormal(mean, scale_tril=cholesky)
-        action = action_distribution.sample()
-        return action
-
-    def to_cholesky_matrix(self, cholesky_vector):
-        k = 0
-        cholesky = torch.zeros(self.action_shape, self.action_shape)
-        for i in range(self.action_shape):
-            for j in range(self.action_shape):
-                if i >= j:
-                    cholesky[i][j] = cholesky_vector.item() if self.action_shape == 1 else cholesky_vector[k].item()
-                    k = k + 1
-        return cholesky
-
 class MpoWorker(object):
-    def __init__(self, ε, ε_μ, ε_Σ, l_max, γ, α, β, env):
+    def __init__(self, ε, ε_μ, ε_Σ, max_episode, γ, α, β, path, env):
         self.env = env
-        self.α = α
-        self.β = β
-        self.ε = ε
-        self.ε_μ = ε_μ
-        self.ε_Σ = ε_Σ
-        self.L_MAX = l_max  # 300
-        self.γ = γ
+
+        # Hyperparameters
+        self.α = α  # scaling factor for the update step of η_μ
+        self.β = β  # scaling factor for the update step of η_Σ
+        self.ε = ε  # hard constraint for the KL
+        self.ε_μ = ε_μ  # hard constraint for the KL
+        self.ε_Σ = ε_Σ  # hard constraint for the KL
+        self.γ = γ  # learning rate
+        self.max_episode = max_episode  # 300
+        self.episode = 0
         self.N = 64
         self.M = 500
         self.CAPACITY = 1e6
         self.BATCH_SIZE = 64
         self.action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
         self.action_range = torch.from_numpy(env.action_space.high)
+        self.PATH = path
 
         # initialize Q-network
         self.critic = Critic(env)
@@ -123,8 +59,7 @@ class MpoWorker(object):
         # initialize replay buffer
         self.buffer = ReplayBuffer(self.CAPACITY)
 
-        self.i = 0
-        self.l_curr = 0
+        # Lagrange Multiplier
         self.η = 1
         self.η_μ = np.random.rand()
         self.η_Σ = np.random.rand()
@@ -149,12 +84,12 @@ class MpoWorker(object):
     #         if self.actor(states[i]) > actions[i]:
     #             c[i] = c[i-1] * self.actor(states[i]) / actions[i]
     #     return c
-    def worker(self):
-        while self.l_curr < self.L_MAX:
+    def train(self):
+        while self.episode < self.max_episode:
+            self.episode += 1
             # update replay buffer B
             observation = self.env.reset()
             mean_reward = 0
-            self.i += 1
             for steps in range(500):
                 action = np.reshape(self.target_actor.action(torch.from_numpy(observation).float()).detach().numpy(), -1)
                 new_observation, reward, done, _ = self.env.step(action)
@@ -162,7 +97,7 @@ class MpoWorker(object):
                 self.buffer.push(observation, action, reward, new_observation)
                 observation = new_observation
                 mean_reward += reward
-            print("Episode:     ", self.i, "Mean reward:    ", mean_reward)
+            print("Episode:     ", self.episode, "Mean reward:    ", mean_reward)
 
             # Find better policy by gradient descent
             for k in range(0, 1):
@@ -191,8 +126,10 @@ class MpoWorker(object):
 
                 # Update Dual-function
                 def dual(η):
-                    """Dual function of the non-parametric variational \n
-                    g(\eta) = \eta\varepsilon + \eta \sum\limits_{s\in\mathcal{S}} \log \left(\sum\limits_{a\in \mathcal{A}} \exp(\frac{Q(a, s)}{\eta})\right)"""
+                    """
+                    Dual function of the non-parametric variational \n
+                    g(η) = η*ε + η \sum \log (\sum \exp(Q(a, s)/η))
+                    """
                     return η * self.ε + η * np.mean(np.log(np.mean(np.exp((additional_q)/ η), 0)))
                 bounds = [(1e-8, None)]
                 res = minimize(dual, np.array([self.η]), method='SLSQP', bounds=bounds)
@@ -275,10 +212,6 @@ class MpoWorker(object):
                     self.η_μ -= self.α * (self.ε_μ - C_μ)
                     self.η_Σ -= self.β * (self.ε_Σ - C_Σ)
 
-
-                    # update_η = minimize(lagrangian, np.array([self.η_μ, self.η_Σ]), method='SLSQP', bounds=bounds)
-                    # print(self.η_μ, self.η_Σ)
-                    # self.η_μ, self.η_Σ = update_η.x[0], update_η.x[1]
                     if (self.η_μ == 0 and self.η_Σ == 0) or counter == 10:
                         unfinished = False
 
@@ -289,6 +222,101 @@ class MpoWorker(object):
                 # Update critic parameters
                 for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
                     target_param.data.copy_(param.data)
+
+            self.save_model()
+
+    def eval(self):
+        state = env.reset()
+
+    def load_model(self):
+        checkpoint = torch.load(self.PATH)
+        self.episode = checkpoint['epoch']
+        self.critic.load_state_dict(checkpoint['critic_state_dict'])
+        self.target_critic.load_state_dict(checkpoint['target_critic_state_dict'])
+        self.actor.load_state_dict(checkpoint['actor_state_dict'])
+        self.target_actor.load_state_dict(checkpoint['target_actor_state_dict'])
+        self.critic_optimizer.load_state_dict(checkpoint['critic_optim_state_dict'])
+        self.actor_optimizer.load_state_dict(checkpoint['critic_state_dict'])
+
+
+    def save_model(self):
+        to_be_saved = {'epoch': self.episode,
+                       'critic_state_dict': self.critic.state_dict(),
+                       'target_critic_state_dict': self.target_critic.state_dict(),
+                       'actor_state_dict': self.actor.state_dict(),
+                       'target_actor_state_dict': self.target_actor.state_dict(),
+                       'critic_optim_state_dict': self.critic_optimizer.state_dict(),
+                       'actor_optim_state_dict': self.actor_optimizer.state_dict()}
+        torch.save(to_be_saved, self.PATH)
+
+class Critic(nn.Module):
+
+    def __init__(self, env):
+        super(Critic, self).__init__()
+        LAYER_1 = 100
+        LAYER_2 = 100
+        self.state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
+        self.action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
+        self.lin1 = nn.Linear(self.state_shape, LAYER_1, True)
+        self.lin2 = nn.Linear(LAYER_1 + self.action_shape, LAYER_2, True)
+        self.lin3 = nn.Linear(LAYER_2, 1, True)
+
+    def forward(self, state, action):
+        x = F.relu(self.lin1(state))
+        x = F.relu(self.lin2(torch.cat((x, action), 1)))
+        x = self.lin3(x)
+        return x
+
+
+class Actor(nn.Module):
+    def __init__(self, env):
+        LAYER_1 = 100
+        LAYER_2 = 100
+        super(Actor, self).__init__()
+        self.state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
+        self.action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
+        self.action_range = torch.from_numpy(env.action_space.high)
+        self.lin1 = nn.Linear(self.state_shape, LAYER_1, True)
+        self.lin2 = nn.Linear(LAYER_1, LAYER_2, True)
+        self.mean_layer = nn.Linear(LAYER_2, self.action_shape, True)
+        self.cholesky_layer = nn.Linear(LAYER_2, int((self.action_shape*self.action_shape + self.action_shape)/2), True)
+        self.cholesky = torch.zeros(self.action_shape,self.action_shape)
+
+    def forward(self, states):
+        x = F.relu(self.lin1(states))
+        x = F.relu(self.lin2(x))
+        mean = self.action_range * torch.tanh(self.mean_layer(x))
+        cholesky_vector = F.softplus(self.cholesky_layer(x))
+        # Turn into cholesky matrix
+        # if self.action_shape == 1:
+        #     return mean, cholesky_vector
+        cholesky = []
+        if cholesky_vector.dim() == 1 and cholesky_vector.shape[0] > 1:
+            cholesky.append(self.to_cholesky_matrix(cholesky_vector))
+        else:
+            for a in cholesky_vector:
+                cholesky.append(self.to_cholesky_matrix(a))
+        # cholesky = torch.stack([self.to_cholesky_matrix(a for a in cholesky_vector)])
+        return mean, torch.stack(cholesky)
+
+    def action(self, observation):
+        mean, cholesky = self.forward(observation)
+        # if self.action_shape == 1:
+            #     action_distribution = Normal(mean, cholesky)
+            # else:
+        action_distribution = MultivariateNormal(mean, scale_tril=cholesky)
+        action = action_distribution.sample()
+        return action
+
+    def to_cholesky_matrix(self, cholesky_vector):
+        k = 0
+        cholesky = torch.zeros(self.action_shape, self.action_shape)
+        for i in range(self.action_shape):
+            for j in range(self.action_shape):
+                if i >= j:
+                    cholesky[i][j] = cholesky_vector.item() if self.action_shape == 1 else cholesky_vector[k].item()
+                    k = k + 1
+        return cholesky
 
 
 env = gym.make('Pendulum-v0')
@@ -302,6 +330,7 @@ gamma = 0.99
 tau = 0.001
 α = 1
 β = 1
+path = os.path.join("/home/theo/study/reinforcement_learning/project", "test.pth")
 
-test = MpoWorker(epsilon, epsilon_mu, epsilon_sigma, l_max, gamma, α, β, env)
-test.worker()
+test = MpoWorker(epsilon, epsilon_mu, epsilon_sigma, l_max, gamma, α, β, path, env)
+test.train()
