@@ -8,6 +8,7 @@ from scipy.optimize import minimize
 import gym
 import quanser_robots
 
+
 from buffer import ReplayBuffer
 
 # optimization problem
@@ -29,7 +30,7 @@ class Critic(nn.Module):
 
     def forward(self, state, action):
         x = F.relu(self.lin1(state))
-        x = F.relu(self.lin2(torch.cat((x, action),1)))
+        x = F.relu(self.lin2(torch.cat((x, action), 1)))
         x = self.lin3(x)
         return x
 
@@ -83,8 +84,10 @@ class Actor(nn.Module):
         return cholesky
 
 class MpoWorker(object):
-    def __init__(self, ε, ε_μ, ε_Σ, l_max, γ, env):
+    def __init__(self, ε, ε_μ, ε_Σ, l_max, γ, α, β, env):
         self.env = env
+        self.α = α
+        self.β = β
         self.ε = ε
         self.ε_μ = ε_μ
         self.ε_Σ = ε_Σ
@@ -115,16 +118,16 @@ class MpoWorker(object):
             target_param.requires_grad = False
 
         # initialize policy optimizer
-        self.actor_optimizer = torch.optim.Adam(self.target_actor.parameters(), lr=5e-4)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=5e-4)
 
         # initialize replay buffer
         self.buffer = ReplayBuffer(self.CAPACITY)
 
         self.i = 0
         self.l_curr = 0
-        self.η = np.random.rand()
-        self.η_μ = 0
-        self.η_Σ = 0
+        self.η = 1
+        self.η_μ = np.random.rand()
+        self.η_Σ = np.random.rand()
 
     # # Q-function gradient
     # def gradient_critic(self, states, actions):
@@ -153,7 +156,7 @@ class MpoWorker(object):
             mean_reward = 0
             self.i += 1
             for steps in range(500):
-                action = np.reshape(self.actor.action(torch.from_numpy(observation).float()).detach().numpy(), -1)
+                action = np.reshape(self.target_actor.action(torch.from_numpy(observation).float()).detach().numpy(), -1)
                 new_observation, reward, done, _ = self.env.step(action)
                 env.render()
                 self.buffer.push(observation, action, reward, new_observation)
@@ -162,59 +165,60 @@ class MpoWorker(object):
             print("Episode:     ", self.i, "Mean reward:    ", mean_reward)
 
             # Find better policy by gradient descent
-            for k in range(0, 10):
+            for k in range(0, 1):
                 # sample a mini-batch of N state action pairs
                 batch = self.buffer.sample(self.N)
                 state_batch, action_batch, reward_batch, next_state_batch = self.buffer.batches_from_sample(batch, self.N)
 
                 # sample M additional action for each state
-                μ, A = self.actor.forward(torch.tensor(state_batch).float())
-                action_distribution = MultivariateNormal(μ, scale_tril=A)
+                target_μ, target_A = self.target_actor.forward(torch.tensor(state_batch).float())
+                action_distribution = MultivariateNormal(target_μ, scale_tril=target_A)
                 additional_q = []
-                additional_action = []
                 for i in range(self.M):
                     action = action_distribution.sample()
-                    additional_action.append(action)
-                    additional_q.append(self.critic.forward(torch.tensor(state_batch).float(), action).detach().numpy())
+                    additional_q.append(self.target_critic.forward(torch.tensor(state_batch).float(), action).detach().numpy())
                 additional_q = np.array(additional_q).squeeze()
-                additional_action = torch.stack(additional_action)
+
                 # E-step
                 # Update Q-function
-                y = torch.from_numpy(reward_batch).float() + self.γ * self.target_critic(torch.from_numpy(next_state_batch).float(), self.actor.action(torch.from_numpy(next_state_batch).float()))
+                y = torch.from_numpy(reward_batch).float() + self.γ * self.target_critic(torch.from_numpy(next_state_batch).float(), self.target_actor.action(torch.from_numpy(next_state_batch).float()))
                 self.critic_optimizer.zero_grad()
                 target = self.critic(torch.from_numpy(state_batch).float(), torch.from_numpy(action_batch).float())
                 loss_critic = MSE(y, target)
                 loss_critic.backward()
                 self.critic_optimizer.step()
+                print("Q-value loss: ", loss_critic)
 
                 # Update Dual-function
                 def dual(η):
                     """Dual function of the non-parametric variational \n
                     g(\eta) = \eta\varepsilon + \eta \sum\limits_{s\in\mathcal{S}} \log \left(\sum\limits_{a\in \mathcal{A}} \exp(\frac{Q(a, s)}{\eta})\right)"""
-                    return η * self.ε + η * np.mean(np.sum(np.exp(additional_q / η), 0))
-                res = minimize(dual, np.array([self.η]))
-                print(res.x[0] - self.η, self.η)
+                    return η * self.ε + η * np.mean(np.log(np.mean(np.exp((additional_q)/ η), 0)))
+                bounds = [(1e-8, None)]
+                res = minimize(dual, np.array([self.η]), method='SLSQP', bounds=bounds)
                 self.η = res.x[0]
 
                 def q(states, μ, A):
                     """q(a|s) = π(a|s) exp(Q(a,s)/η)"""
                     π = MultivariateNormal(μ, scale_tril=A).sample()
-                    return π * torch.exp(self.critic.forward(states, π) / self.η)
+                    Q = torch.exp(self.critic.forward(states, π) / self.η)
+                    return π * Q, Q
 
                 # M-step
-
-                def lagrangian(η):
-                    η_μ, η_Σ = η[0], η[1]
-                    return np.mean(np.mean(additional_logprob.detach().numpy(), 0) + η_μ * (self.ε_μ - C_μ.detach().numpy()) + η_Σ * (self.ε_Σ - C_Σ.detach().numpy()))
-
-                target_μ, target_A = self.target_actor.forward(torch.tensor(state_batch).float())
+                μ, A = self.actor.forward(torch.tensor(state_batch).float())
                 inner_Σ = []
                 inner_μ = []
 
                 additional_logprob = []
+                normalization = []
                 for a in range(self.M):
-                    additional_logprob.append(q(torch.from_numpy(state_batch).float(), target_μ, target_A))
+                    new_q, Q = q(torch.from_numpy(state_batch).float(), μ, A)
+                    pi = MultivariateNormal(μ, A)
+                    normalization.append(Q)
+                    additional_logprob.append(pi.log_prob(new_q))
+                normalization = torch.mean(torch.stack(normalization).squeeze(), 0)
                 additional_logprob = torch.stack(additional_logprob).squeeze()
+                additional_logprob = additional_logprob / normalization
 
                 for mean, target_mean, a, target_a in zip(μ, target_μ, A, target_A):
                     Σ = a @ a.t()
@@ -225,23 +229,34 @@ class MpoWorker(object):
 
                 inner_μ = torch.stack(inner_μ)
                 inner_Sigma = torch.stack(inner_Σ)
-                C_μ = 1 / 2 * torch.mean(inner_Sigma)
-                C_Σ = 1 / 2 * torch.mean(inner_μ)
+                C_μ = 0.5 * torch.mean(inner_Sigma)
+                C_Σ = 0.5 * torch.mean(inner_μ)
 
-                for i in range(20):
+                unfinished = True
+                counter = 0
+                while(unfinished):
+                    counter += 1
                     self.actor_optimizer.zero_grad()
-                    loss_policy = torch.mean(torch.mean(additional_logprob, 0) + self.η_μ * (self.ε_μ - C_μ) + self.η_Σ * (self.ε_Σ - C_Σ))
+                    loss_policy = (torch.mean(additional_logprob) + self.η_μ * (self.ε_μ - C_μ) + self.η_Σ * (self.ε_Σ - C_Σ))
                     loss_policy.backward(retain_graph=True)
                     self.actor_optimizer.step()
+                    print("Loss: ", loss_policy.item())
 
-                    target_μ, target_A = self.target_actor.forward(torch.tensor(state_batch).float())
+                    μ, A = self.actor.forward(torch.tensor(state_batch).float())
                     inner_Σ = []
                     inner_μ = []
 
                     additional_logprob = []
+                    normalization = []
                     for a in range(self.M):
-                        additional_logprob.append(q(torch.from_numpy(state_batch).float(), target_μ, target_A))
+                        new_q, Q = q(torch.from_numpy(state_batch).float(), μ, A)
+                        pi = MultivariateNormal(μ, A)
+                        normalization.append(Q)
+                        additional_logprob.append(pi.log_prob(new_q))
+                    normalization = torch.mean(torch.stack(normalization).squeeze(), 0)
                     additional_logprob = torch.stack(additional_logprob).squeeze()
+                    additional_logprob = additional_logprob/normalization
+
 
                     for mean, target_mean, a, target_a in zip(μ, target_μ, A, target_A):
                         Σ = a @ a.t()
@@ -253,15 +268,23 @@ class MpoWorker(object):
                     inner_μ = torch.stack(inner_μ)
                     inner_Sigma = torch.stack(inner_Σ)
 
-                    C_μ = 1 / 2 * torch.mean(inner_Sigma)
-                    C_Σ = 1 / 2 * torch.mean(inner_μ)
+                    C_μ = 0.5 * torch.mean(inner_Sigma)
+                    C_Σ = 0.5 * torch.mean(inner_μ)
+                    print("C_μ: ", C_μ.item(), "   C_Σ: ", C_Σ.item(), "    log_prob: ", np.mean(additional_logprob.detach().numpy()), self.ε_μ - C_μ, self.ε_Σ - C_Σ)
 
-                    update_η = minimize(lagrangian, np.array([self.η_μ, self.η_Σ]))
-                    self.η_μ, self.η_Σ = update_η.x[0], update_η.x[1]
+                    self.η_μ -= self.α * (self.ε_μ - C_μ)
+                    self.η_Σ -= self.β * (self.ε_Σ - C_Σ)
+
+
+                    # update_η = minimize(lagrangian, np.array([self.η_μ, self.η_Σ]), method='SLSQP', bounds=bounds)
+                    # print(self.η_μ, self.η_Σ)
+                    # self.η_μ, self.η_Σ = update_η.x[0], update_η.x[1]
+                    if (self.η_μ == 0 and self.η_Σ == 0) or counter == 10:
+                        unfinished = False
 
                 # Update policy parameters
                 for target_param, param in zip(self.target_actor.parameters(), self.actor.parameters()):
-                    param.data.copy_(target_param.data)
+                    target_param.data.copy_(param.data)
 
                 # Update critic parameters
                 for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
@@ -277,6 +300,8 @@ epsilon_sigma = 0.0001
 l_max = 100000
 gamma = 0.99
 tau = 0.001
+α = 1
+β = 1
 
-test = MpoWorker(epsilon, epsilon_mu, epsilon_sigma, l_max, gamma, env)
+test = MpoWorker(epsilon, epsilon_mu, epsilon_sigma, l_max, gamma, α, β, env)
 test.worker()
