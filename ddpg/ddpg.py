@@ -18,7 +18,7 @@ env = gym.make('Qube-v0')
 MSE = nn.MSELoss()
 
 # Hyperparameters
-X_START, THETA, MU, SIGMA, DELTA_T = 0, 0.15, 0, 0.2, 1e-2
+#X_START, THETA, MU, SIGMA, DELTA_T = 0, 0.15, 0, 0.2, 1e-2
 CAPACITY = 1e6
 BATCH_SIZE = 64
 GAMMA = 0.99
@@ -28,6 +28,27 @@ TAU = 0.001
 M = int(1e4)
 #epsiode length
 T = 50
+
+
+class DDPG(object):
+
+    def __init__(self, env, noise, buffer_capacity=1e6, batch_size=64,
+                 gamma=0.99, tau=0.001, episodes=int(1e4),
+                 episode_length=60, actor_l1=None, actor_l2=None,
+                 critic_l1=None, critic_l2=None):
+        self.env = env
+        self.state_shape = self.env.observation_space.shape[0]
+        self.action_shape = self.env.action_space.shape[0]
+        self.noise = noise
+        self.buffer = ReplayBuffer(buffer_capacity)
+        self.batch_size = batch_size
+        self.gamma = gamma
+        self.tau = tau
+        self.episodes = episodes
+        self.episode_length = episode_length
+        self.actor = Actor()
+
+
 
 def ddpg_torch(env):
     state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
@@ -44,12 +65,11 @@ def ddpg_torch(env):
     # initialize critic optimizer
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=1e-3)
     # initialize random Process
-    noise = OrnsteinUhlenbeck(X_START, THETA, MU, SIGMA, DELTA_T,
-                              action_shape=action_shape)
+    noise = OrnsteinUhlenbeck(action_shape=action_shape)
 
-    ###############################################
-    # initialize target networks and copying params
-    ###############################################
+    #################################################
+    # initialize target networks and copying params #
+    #################################################
     target_critic = Critic(state_shape=state_shape, action_shape=action_shape)
     target_actor = Actor(state_shape=state_shape, action_shape=action_shape)
 
