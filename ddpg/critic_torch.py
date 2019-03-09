@@ -32,3 +32,16 @@ class Critic(nn.Module):
         x = F.relu(self.lin2(torch.cat((x, action), 1)))
         x = self.lin3(x)
         return x
+
+    def eval(self, state, action):
+        """
+        Forward function forwarding an input through the network
+        :param state: (State) a state of the environment
+        :param action: (Action) an action of the action-space
+        :return: (float) output of the network(= Q-value for the given
+                  state-action pair)
+        """
+        x = F.relu(self.lin1(state))
+        x = F.relu(self.lin2(torch.cat((x, action), 0)))
+        x = self.lin3(x)
+        return x

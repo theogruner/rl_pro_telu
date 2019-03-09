@@ -44,9 +44,10 @@ class OrnsteinUhlenbeck(Noise):
         make a time-step in the Ornstein Uhlenbeck process
         :return: the current noise value
         """
+        x = self.x
         self.x = self.x + self.theta*(self.mu - self.x)*self.delta_t \
                  + self.sigma * self._wiener_process()
-        return self.x
+        return x
 
     def reset(self):
         """

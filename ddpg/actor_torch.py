@@ -22,14 +22,27 @@ class Actor(nn.Module):
 
     def forward(self, state):
         """
-        Forward function forwarding an input through the network
+        Forward function for training
+        :param state: ([State]) a (batch of) state(s) of the environment
+        :return: (float) output of the network(= action chosen by policy at
+                  given state)
+        """
+        s = self.state_norm(state)
+        x = F.relu(self.lin1(state))
+        x = self.norm1(x)
+        x = F.relu(self.lin2(x))
+        x = self.norm2(x)
+        x = torch.tanh(self.lin3(x))
+        return x
+
+    def action(self, state):
+        """
+        Forward function for action selection
         :param state: (State) a state of the environment
         :return: (float) output of the network(= action chosen by policy at
                   given state)
         """
-        x = F.relu(self.lin1(self.state_norm(state)))
-        x = self.norm1(x)
+        x = F.relu(self.lin1(state))
         x = F.relu(self.lin2(x))
-        x = self.norm2(x)
         x = torch.tanh(self.lin3(x))
         return x
