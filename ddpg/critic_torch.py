@@ -27,8 +27,8 @@ class Critic(nn.Module):
         :return: (float) output of the network(= Q-value for the given
                   state-action pair)
         """
-        x = F.relu(self.lin1(self.state_norm(state)))
-        x = self.norm1(x)
+        x = F.relu(self.lin1(state))
+        #x = self.norm1(x)
         x = F.relu(self.lin2(torch.cat((x, action), 1)))
         x = self.lin3(x)
         return x

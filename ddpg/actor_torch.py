@@ -27,11 +27,11 @@ class Actor(nn.Module):
         :return: (float) output of the network(= action chosen by policy at
                   given state)
         """
-        s = self.state_norm(state)
+        #s = self.state_norm(state)
         x = F.relu(self.lin1(state))
-        x = self.norm1(x)
+        #x = self.norm1(x)
         x = F.relu(self.lin2(x))
-        x = self.norm2(x)
+        #x = self.norm2(x)
         x = torch.tanh(self.lin3(x))
         return x
 

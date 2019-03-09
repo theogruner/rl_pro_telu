@@ -175,9 +175,9 @@ class DDPG(object):
             mean_q_e = []
             for step in range(episode_length):
                 state = torch.tensor(observation).float()
-                action = self.actor.action(state).detach()
-                q = self.critic.eval(state, action).item()
-                mean_q_e.append(q)
+                action = self._select_action(state)
+                # q = self.critic.eval(state, action).item()
+                # mean_q_e.append(q)
                 new_observation, rew, done, _ = self.env.step(action)
                 if render:
                     self.env.render()
@@ -311,9 +311,9 @@ class DDPG(object):
 #                target_param.data.copy_(target_param.data * (1.0 - TAU) + param.data * TAU)
 
 
-envv = gym.make('Pendulum-v0')
-model = DDPG(envv)
-model.load_model()
-model.train(episodes=100, episode_length=500, render=True)
-model.eval(episode_length=500, episodes=100)
+#envv = gym.make('Pendulum-v0')
+#model = DDPG(envv)
+#model.load_model()
+#model.train(episodes=100, episode_length=64, render=True)
+#model.eval(episode_length=500, episodes=100)
 
