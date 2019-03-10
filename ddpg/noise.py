@@ -60,4 +60,4 @@ class OrnsteinUhlenbeck(Noise):
         standard wiener process as a random generator
         :return: a random value in shape of the given action shape
         """
-        return np.sqrt(self.delta_t)* np.random.normal(size=self.mu.shape)
+        return np.sqrt(self.delta_t) * np.random.normal(size=self.mu.shape)

@@ -18,7 +18,7 @@ def _parse():
                         help='flag wether to evaluate or not')
     parser.add_argument('--eval_episodes', type=int, default=100,
                         help='number of episodes for evaluation')
-    parser.add_argument('--eval_ep_length', type=int, default=500,
+    parser.add_argument('--eval_ep_length', type=int, default=10000,
                         help='length of an evaluation episode')
     parser.add_argument('--eval_render', type=bool, default=True,
                         help='wether to or not to render while evaluation')
@@ -32,17 +32,17 @@ def _parse():
                         help='soft update coefficient')
     parser.add_argument('--episodes', type=int, default=int(1e4),
                         help='number of episodes to learn')
+    parser.add_argument('--episode_length', type=int, default=100,
+                        help='length of an episodes (number of training steps)')
     parser.add_argument('--learning_rate', type=float, default=1e-3,
                         help='learning rate for the optimization step')
-    parser.add_argument('--episode_length', type=int, default=60,
-                        help='length of an episodes (number of training steps)')
     parser.add_argument('--actor_layers', type=tuple, default=(400, 300),
                         help='size of the policy network layers')
     parser.add_argument('--critic_layers', type=tuple, default=(400, 300),
                         help='size of the critic network layers')
     parser.add_argument('--log', type=bool, default=True,
                         help='flag for log messages while learning')
-    parser.add_argument('--render', type=bool, default=False,
+    parser.add_argument('--render', type=bool, default=True,
                         help='flag if to render while learning')
     parser.add_argument('--safe', type=bool, default=True,
                         help='flag if to safe the model')
@@ -56,7 +56,7 @@ def _parse():
                         help='mean reversion level of the noise (Ornstein Uhlenbeck)')
     parser.add_argument('---sigma_noise', type=float, default=0.2,
                         help='scale of wiener process in the noise (Ornstein Uhlenbeck)')
-    parser.add_argument('---x_start', type=list, default=None,
+    parser.add_argument('---x_start_noise', type=list, default=None,
                         help='starting point of the noise (Ornstein Uhlenbeck)')
 
     args = parser.parse_args()
@@ -71,7 +71,7 @@ if __name__ == '__main__':
                               theta=model_args['theta_noise'],
                               mu=model_args['mu_noise'],
                               sigma=model_args['sigma_noise'],
-                              x_start=model_args['x_start'])
+                              x_start=model_args['x_start_noise'])
 
     model = DDPG(env, noise,
                  buffer_capacity=model_args['buffer_capacity'],
