@@ -2,33 +2,32 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch.tensor
 import torch
-import gym
-import numpy as np
-
-LAYER_1 = 200
-LAYER_2 = 200
 
 
 class Critic(nn.Module):
-
-    def __init__(self, env):
+    """
+    Critic class for Q-function network
+    :param env: gym environment for state and action shapes
+    :param layer1: (int) size of the first hidden layer (default = 200)
+    :param layer2: (int) size of the first hidden layer (default = 200)
+    """
+    def __init__(self, env, layer1=200, layer2=200):
         super(Critic, self).__init__()
-        self.state_shape = 1 if type(env.observation_space) == gym.spaces.discrete.Discrete else env.observation_space.shape[0]
-        self.action_shape = 1 if type(env.action_space) == gym.spaces.discrete.Discrete else env.action_space.shape[0]
-        self.lin1 = nn.Linear(self.state_shape, LAYER_1, True)
-        self.lin2 = nn.Linear(LAYER_1 + self.action_shape, LAYER_2, True)
-        self.lin3 = nn.Linear(LAYER_2, 1, True)
+        self.state_shape = env.observation_space.shape[0]
+        self.action_shape = env.action_space.shape[0]
+        self.lin1 = nn.Linear(self.state_shape, layer1, True)
+        self.lin2 = nn.Linear(layer1 + self.action_shape, layer2, True)
+        self.lin3 = nn.Linear(layer2, 1, True)
 
     def forward(self, state, action):
-        action = torch.tensor([action])
+        """
+        Forward function forwarding an input through the network
+        :param state: (State) a state of the environment
+        :param action: (Action) an action of the action-space
+        :return: (float) output of the network(= Q-value for the given
+                  state-action pair)
+        """
         x = F.relu(self.lin1(state))
-        x = F.relu(self.lin2(torch.cat((x, action),0)))
+        x = F.relu(self.lin2(torch.cat((x, action), 1)))
         x = self.lin3(x)
         return x
-
-# critic = Critic(1,1)
-# # b = np.array([1,2,4])
-# # c = torch.tensor([2,4,4,5])
-# # print(torch.cat((torch.from_numpy(b),c),0))
-# a = critic.forward(0.2,0.4)
-# # a = critic.forward(torch.tensor([0.2]),torch.tensor(np.array([0.4])))
