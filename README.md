@@ -53,7 +53,7 @@ The algorithms are intended for continuous gym environments !
    * Make sure the script is the same directory as the _ddpg_ package.
    * The noise should extend the _Noise_ class in _noise.py_ (contain a _reset_ and _iteration_ function) 
    * Following example basicly does the same as the combination of the previous examples 
-   (except that no model has to be loaded in, to load a model use _model.load(PATH)_) 
+   (except that no model has to be loaded in, to load a model use _model.load_model('PATH')_) 
    
         ```python
         import gym    

@@ -4,10 +4,10 @@ import numpy as np
 import gym
 import quanser_robots
 
-from buffer import ReplayBuffer
-from noise import OrnsteinUhlenbeck
-from critic_torch import Critic
-from actor_torch import Actor
+from .buffer import ReplayBuffer
+from .noise import OrnsteinUhlenbeck
+from .critic_torch import Critic
+from .actor_torch import Actor
 
 from tensorboardX import SummaryWriter
 

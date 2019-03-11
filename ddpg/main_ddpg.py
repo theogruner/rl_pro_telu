@@ -2,8 +2,8 @@ import argparse
 
 import gym
 import quanser_robots
-from noise import OrnsteinUhlenbeck
-from ddpg import DDPG
+from .noise import OrnsteinUhlenbeck
+from .ddpg import DDPG
 
 
 def _add_bool_arg(parser, name, default=False):
