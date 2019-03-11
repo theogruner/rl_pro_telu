@@ -77,8 +77,8 @@ The algorithms are intended for continuous gym environments !
    ```python
    model = DDPG(env, noise, gamma=0.5, tau=0.1, learning_rate=1e-2)
    ```
-###MPO
-###Logging
+### MPO
+### Logging
 By default logging is enabled and safes the logs in the _runs/_ directory.
 Inspection them works by:
 
