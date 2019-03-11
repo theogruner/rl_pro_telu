@@ -1,6 +1,6 @@
 # Project_RL
 Implementation of the Deep Deterministic Policy Gradient ([DDPG](https://arxiv.org/abs/1509.02971)) and Maximum A Posteriori
-Policy Optimization ([MPO](https://arxiv.org/abs/1806.06920)) Reinforcement Algorithms for continuous 
+Policy Optimization ([MPO](https://arxiv.org/abs/1806.06920)) Reinforcement Learning Algorithms for continuous 
 control on [OpenAI gym](https://github.com/openai/gym) environments.
 
 ## Prerequisites
