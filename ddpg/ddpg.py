@@ -9,6 +9,8 @@ from noise import OrnsteinUhlenbeck
 from critic_torch import Critic
 from actor_torch import Actor
 
+from tensorboardX import SummaryWriter
+
 
 class DDPG(object):
     """
@@ -17,24 +19,24 @@ class DDPG(object):
     :param env: (Gym Environment) gym environment to learn from
     :param noise: (Noise) the noise to learn with
     :param buffer_capacity: (int) capacity of the replay buffer
-    :param batch_size: (int) size of the smaple batches
+    :param batch_size: (int) size of the sample batches
     :param gamma: (float) discount factor
     :param tau: (float) soft update coefficient
-    :param episodes: (int) number of episondes to make
+    :param episodes: (int) number of episodes to make
     :param learning_rate: (float) learning rate of the optimization step
     :param episode_length: (int) length of an episode (= training steps per episode)
     :param actor_layers: (int, int) size of the layers of the policy network
     :param critic_layers: (int, int) size of the layers of the critic network
     :param log: (bool) flag for logging
     :param render: (bool) flag if to render while training or not
-    :param safe: (bool) flag if to safe the model if finished
-    :param safe_path: (str) path for saving and loading a model
+    :param save: (bool) flag if to save the model if finished
+    :param save_path: (str) path for saving and loading a model
 
     """
     def __init__(self, env, noise=None, buffer_capacity=1e6, batch_size=64,
                  gamma=0.99, tau=0.001, episodes=int(1e4), learning_rate=1e-3,
-                 episode_length=60, actor_layers=None, critic_layers=None,
-                 log=True, render=True, safe=True, safe_path="ddpg_model.pt"):
+                 episode_length=3000, actor_layers=None, critic_layers=None,
+                 log=True, render=True, save=True, save_path="ddpg_model.pt"):
         # initialize env and read out shapes
         self.env = env
         self.state_shape = self.env.observation_space.shape[0]
@@ -44,7 +46,7 @@ class DDPG(object):
         self.noise = noise if noise is not None else OrnsteinUhlenbeck(self.action_shape)
         self.buffer = ReplayBuffer(buffer_capacity)
         self.loss = nn.MSELoss()
-        # initialize some hyperparameters
+        # initialize hyperparameters
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
@@ -72,14 +74,18 @@ class DDPG(object):
             target_param.requires_grad = False
         # fill buffer with random transitions
         self._random_trajectory(self.batch_size)
-        # control/log variables
+        # control/log variables or flags
         self.episode = 0
         self.log = log
         self.render = render
-        self.safe = safe
-        self.safe_path = safe_path
+        self.save = save
+        self.save_path = save_path
 
     def _random_trajectory(self, length):
+        """
+        pushes a given number of random transitions on the buffer
+        :param length: (int) number of random actions to take
+        """
         observation = self.env.reset()
         for i in range(0, length):
             action = self.env.action_space.sample()
@@ -89,16 +95,28 @@ class DDPG(object):
             if done:
                 observation = self.env.reset()
 
-    def _select_action(self, observation, noise=True):
+    def _select_action(self, observation, train=True):
+        """
+        selects a action based on the policy(/target policy) and a given state
+        :param observation: (State) the state the decision is based on
+        :param noise: (bool) a flag determining wether to add noise to the action or not
+        :return: (Action) the action taken following the policy plus noise
+                 (target policy without noise if not training)
+        """
         obs = torch.tensor(observation).float()
         a = self.actor(obs).detach().numpy()
-        a = a + self.noise.iteration() if noise else a
+        a = a + self.noise.iteration() if train else self.target_actor(obs).detach().numpy()
         a = a * self.action_range
         a = np.clip(a, a_min=-self.action_range,
                     a_max=self.action_range)
         return a
 
     def _sample_batches(self, size):
+        """
+        samples corresponding batches of a given size for all transition elements
+        :param size: (int) size of batches
+        :return: ([State],[Action],[Reward],[State]) tuple of all batches
+        """
         sample = self.buffer.sample(size)
         state_batch, action_batch, reward_batch, next_state_batch = \
             self.buffer.batches_from_sample(sample, self.batch_size)
@@ -108,6 +126,9 @@ class DDPG(object):
         return state_batch, action_batch, reward_batch, next_state_batch
 
     def _soft_update(self):
+        """
+        soft-updates the target network with respect to the soft-update coefficent
+        """
         for target_param, param in zip(self.target_critic.parameters(),
                                        self.critic.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
@@ -116,37 +137,68 @@ class DDPG(object):
                                        self.actor.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
 
-    def train(self, episodes=None, episode_length=None, render=None, safe=None, safe_path=None, log=None):
+    def train(self, episodes=None, episode_length=None, render=None, save=None, save_path=None, log=None):
+        """
+        trains the model
+        :param episodes: (int) number of episodes to make
+        :param episode_length: (int) length of an episode (= training steps per episode)
+        :param render: (bool) flag if to render while training
+        :param save: (bool) flag if to save the model after training
+        :param save_path: (str) path where to save the model
+        :param log: (bool) flag for logging messages and recording
+        """
         rend = render if render is not None else self.render
-        sf = safe if safe is not None else self.safe
-        sf_path = safe_path if safe_path is not None else self.safe_path
+        sf = save if save is not None else self.save
+        sf_path = save_path if save_path is not None else self.save_path
         ep = episodes if episodes is not None else self.episodes
         it = episode_length if episode_length is not None else self.episode_length
+
+        # initialize logging
+        log_f = log if log is not None else self.log
+        if log_f:
+            writer = SummaryWriter()
+            iteration = 0
+            summed_rew = 0
+            summed_q = 0
+            summed_qloss = 0
+
 
         for episode in range(0, ep):
             self.noise.reset()
             observation = self.env.reset()
 
             for t in range(1, it + 1):
+                # logging
+                if iteration % 3000 == 0:
+                    summed_rew = 0
+                    summed_q = 0
+                    summed_qloss = 0
+                # choose action and execute it
                 action = self._select_action(observation)
-
                 new_observation, reward, done, _ = self.env.step(action)
                 if rend is True:
                     self.env.render()
+                # logging
+                summed_rew += reward.item()
+                summed_q += self.critic.log(torch.tensor(observation).float(),
+                                            torch.tensor(action).float()).detach().item()
+                iteration += 1
 
+                # push transition onto the buffer
                 self.buffer.push(observation, action, reward, new_observation)
                 observation = new_observation
 
+                # sample batches for training
                 state_batch, action_batch, reward_batch, next_state_batch = \
                     self._sample_batches(self.batch_size)
 
+                # update critic
                 y = reward_batch + self.gamma * self.target_critic(next_state_batch, self.target_actor(next_state_batch))
 
-
-                # update critic
                 self.critic_optimizer.zero_grad()
                 target = self.critic(state_batch, action_batch)
                 loss_critic = self.loss(y, target)
+                summed_qloss += loss_critic         # logging
                 loss_critic.backward()
                 self.critic_optimizer.step()
 
@@ -160,11 +212,28 @@ class DDPG(object):
                 # update parameter
                 self._soft_update()
 
-        if sf is True:
-            self.safe_model(sf_path)
+            # logging
+            if iteration % 3000 == 0:
+                writer.add_scalar('data/mean_reward', summed_rew/3000, iteration)
+                writer.add_scalar('data/mean_q', summed_q/3000, iteration)
+                writer.add_scalar('data/mean_qloss', summed_qloss/3000, iteration)
+            print("episode " + str(episode+1) + " of " + str(ep))
 
-    #TODO path nicht vergessen
+        # self._update_episode_log(ep, it)
+        if sf is True:
+            self.save_model(sf_path)
+
+
+    # TODO eval
     def eval(self, episodes, episode_length, render=True):
+        """
+        method for evaluating current model
+        :param episodes: (int) number of episodes for the evaluation
+        :param episode_length: (int) length of a single episode (0 -> until done)
+        :param render: (bool) flag if to render while evaluating
+        :return: ([[float]],[float],[float]) tuple of arrays, size is number of episodes and one entry corresponds to one episode,
+                 with Format (rewards, mean reward w.r.t. all previous rewards, mean q-value w.r.t. all previous episodes)
+        """
         self.actor.eval()
         reward = []
         mean_reward = []
@@ -176,7 +245,7 @@ class DDPG(object):
             mean_q_e = []
             for step in range(episode_length):
                 state = torch.tensor(observation).float()
-                action = self._select_action(state, noise=False)
+                action = self._select_action(state, train=False)
                 # obs = torch.tensor(observation).float()
                 # q = self.critic.eval(state, action).item()
                 # mean_q_e.append(q)
@@ -186,8 +255,6 @@ class DDPG(object):
                 reward_e.append(rew.item())
                 mean_reward_e.append(np.mean(reward_e).item())
                 observation = new_observation
-                if done:
-                    break
             reward.append(reward_e)
             mean_reward.append(mean_reward_e)
             mean_q.append(mean_q_e)
@@ -195,9 +262,12 @@ class DDPG(object):
         self.actor.train()
         return reward, mean_reward, mean_q
 
-
-    def safe_model(self, path=None):
-        safe_path = path if path is not None else self.safe_path
+    def save_model(self, path=None):
+        """
+        saves current model to a given path
+        :param path: (str) saving path for the model
+        """
+        save_path = path if path is not None else self.save_path
         data = {
             'epoch': self.episode,
             'critic_state_dict': self.critic.state_dict(),
@@ -206,10 +276,14 @@ class DDPG(object):
             'target_actor_state_dict': self.target_actor.state_dict(),
             'critic_optim_state_dict': self.critic_optimizer.state_dict(),
             'actor_optim_state_dict': self.actor_optimizer.state_dict()}
-        torch.save(data, safe_path)
+        torch.save(data, save_path)
 
     def load_model(self, path=None):
-        load_path = path if path is not None else self.safe_path
+        """
+        loads a model from a given path
+        :param path: (str) loading path for the model
+        """
+        load_path = path if path is not None else self.save_path
         checkpoint = torch.load(load_path)
         self.episode = checkpoint['epoch']
         self.critic.load_state_dict(checkpoint['critic_state_dict'])
@@ -218,10 +292,3 @@ class DDPG(object):
         self.target_actor.load_state_dict(checkpoint['target_actor_state_dict'])
         self.critic_optimizer.load_state_dict(checkpoint['critic_optim_state_dict'])
         self.actor_optimizer.load_state_dict(checkpoint['actor_optim_state_dict'])
-
-#envv = gym.make('Pendulum-v0')
-#model = DDPG(envv)
-#model.load_model()
-#model.train(episodes=100, episode_length=64, render=True)
-#model.eval(episode_length=500, episodes=100)
-

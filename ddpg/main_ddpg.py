@@ -6,22 +6,26 @@ from noise import OrnsteinUhlenbeck
 from ddpg import DDPG
 
 
+def _add_bool_arg(parser, name, default=False):
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument('--' + name, dest=name, action='store_true')
+    group.add_argument('--no-' + name, dest=name, action='store_false')
+    parser.set_defaults(**{name: default})
+
+
 def _parse():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      description='Train a ddpg model with an Ornstein Uhlenbeck noise')
 
     parser.add_argument('--env', type=str, default='Levitation-v0',
                         help='a gym environment ID')
-    parser.add_argument('--train', type=bool, default=True,
-                        help='flag wether to train or not')
-    parser.add_argument('--eval', type=bool, default=False,
-                        help='flag wether to evaluate or not')
+    _add_bool_arg(parser, 'train', default=True)
+    _add_bool_arg(parser, 'eval', default=False)
     parser.add_argument('--eval_episodes', type=int, default=100,
                         help='number of episodes for evaluation')
-    parser.add_argument('--eval_ep_length', type=int, default=10000,
+    parser.add_argument('--eval_ep_length', type=int, default=500,
                         help='length of an evaluation episode')
-    parser.add_argument('--eval_render', type=bool, default=True,
-                        help='wether to or not to render while evaluation')
+    _add_bool_arg(parser, 'eval_render', default=True)
     parser.add_argument('--buffer_capacity', type=int, default=int(1e6),
                         help='capacity of the buffer')
     parser.add_argument('--batch_size', type=int, default=64,
@@ -32,7 +36,7 @@ def _parse():
                         help='soft update coefficient')
     parser.add_argument('--episodes', type=int, default=int(1e4),
                         help='number of episodes to learn')
-    parser.add_argument('--episode_length', type=int, default=100,
+    parser.add_argument('--episode_length', type=int, default=300,
                         help='length of an episodes (number of training steps)')
     parser.add_argument('--learning_rate', type=float, default=1e-3,
                         help='learning rate for the optimization step')
@@ -40,16 +44,13 @@ def _parse():
                         help='size of the policy network layers')
     parser.add_argument('--critic_layers', type=tuple, default=(400, 300),
                         help='size of the critic network layers')
-    parser.add_argument('--log', type=bool, default=True,
-                        help='flag for log messages while learning')
-    parser.add_argument('--render', type=bool, default=True,
-                        help='flag if to render while learning')
-    parser.add_argument('--safe', type=bool, default=True,
-                        help='flag if to safe the model')
-    parser.add_argument('--load', type=bool, default=False,
-                        help='flag if to load a model')
+    _add_bool_arg(parser, 'log', default=True)
+    _add_bool_arg(parser, 'render', default=True)
+    _add_bool_arg(parser, 'save', default=True)
+    parser.add_argument('--load', type=str, default=None,
+                        help='loading path if given')
     parser.add_argument('--path', type=str, default='ddpg_model.pt',
-                        help='saving(loading) path if safe(load) flag is set True')
+                        help='saving path if save flag is set True')
     parser.add_argument('---theta_noise', type=float, default=0.15,
                         help='mean reversion rate of the noise (Ornstein Uhlenbeck)')
     parser.add_argument('---mu_noise', type=float, default=0.0,
@@ -85,10 +86,10 @@ if __name__ == '__main__':
                  critic_layers=model_args['critic_layers'],
                  log=model_args['log'],
                  render=model_args['render'],
-                 safe=model_args['safe'],
-                 safe_path=model_args['path'])
-    if model_args['load']:
-        model.load_model(model_args['path'])
+                 save=model_args['save'],
+                 save_path=model_args['path'])
+    if model_args['load'] is not None:
+        model.load_model(model_args['load'])
     if model_args['train']:
         model.train()
     if model_args['eval']:
