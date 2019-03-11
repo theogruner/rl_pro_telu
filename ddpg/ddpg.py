@@ -162,7 +162,6 @@ class DDPG(object):
             summed_q = 0
             summed_qloss = 0
 
-
         for episode in range(0, ep):
             self.noise.reset()
             observation = self.env.reset()
@@ -179,7 +178,7 @@ class DDPG(object):
                 if rend is True:
                     self.env.render()
                 # logging
-                summed_rew += reward.item()
+                summed_rew += reward
                 summed_q += self.critic.log(torch.tensor(observation).float(),
                                             torch.tensor(action).float()).detach().item()
                 iteration += 1
@@ -213,13 +212,16 @@ class DDPG(object):
                 self._soft_update()
 
             # logging
+            self.episode += 1
             if iteration % 3000 == 0:
+                if self.save:
+                    self.save_model(self.save_path)
                 writer.add_scalar('data/mean_reward', summed_rew/3000, iteration)
                 writer.add_scalar('data/mean_q', summed_q/3000, iteration)
                 writer.add_scalar('data/mean_qloss', summed_qloss/3000, iteration)
             print("episode " + str(episode+1) + " of " + str(ep))
 
-        # self._update_episode_log(ep, it)
+        writer.close()
         if sf is True:
             self.save_model(sf_path)
 
@@ -234,15 +236,15 @@ class DDPG(object):
         :return: ([[float]],[float],[float]) tuple of arrays, size is number of episodes and one entry corresponds to one episode,
                  with Format (rewards, mean reward w.r.t. all previous rewards, mean q-value w.r.t. all previous episodes)
         """
-        self.actor.eval()
-        reward = []
-        mean_reward = []
-        mean_q = []
+        # self.actor.eval()
+        # reward = []
+        # mean_reward = []
+        # mean_q = []
         for episode in range(episodes):
             observation = self.env.reset()
-            reward_e = []
-            mean_reward_e = []
-            mean_q_e = []
+            # reward_e = []
+            # mean_reward_e = []
+            # mean_q_e = []
             for step in range(episode_length):
                 state = torch.tensor(observation).float()
                 action = self._select_action(state, train=False)
@@ -252,15 +254,15 @@ class DDPG(object):
                 new_observation, rew, done, _ = self.env.step(action)
                 if render:
                     self.env.render()
-                reward_e.append(rew.item())
-                mean_reward_e.append(np.mean(reward_e).item())
+                # reward_e.append(rew.item())
+                # mean_reward_e.append(np.mean(reward_e).item())
                 observation = new_observation
-            reward.append(reward_e)
-            mean_reward.append(mean_reward_e)
-            mean_q.append(mean_q_e)
+            # reward.append(reward_e)
+            # mean_reward.append(mean_reward_e)
+            # mean_q.append(mean_q_e)
 
-        self.actor.train()
-        return reward, mean_reward, mean_q
+        # self.actor.train()
+        # return reward, mean_reward, mean_q
 
     def save_model(self, path=None):
         """

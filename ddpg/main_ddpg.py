@@ -39,7 +39,7 @@ def _parse():
     parser.add_argument('--episode_length', type=int, default=300,
                         help='length of an episodes (number of training steps)')
     parser.add_argument('--learning_rate', type=float, default=1e-3,
-                        help='learning rate for the optimization step')
+                        help='learning rate for the opimization step')
     parser.add_argument('--actor_layers', type=tuple, default=(400, 300),
                         help='size of the policy network layers')
     parser.add_argument('--critic_layers', type=tuple, default=(400, 300),
@@ -49,7 +49,7 @@ def _parse():
     _add_bool_arg(parser, 'save', default=True)
     parser.add_argument('--load', type=str, default=None,
                         help='loading path if given')
-    parser.add_argument('--path', type=str, default='ddpg_model.pt',
+    parser.add_argument('--save_path', type=str, default='ddpg_model.pt',
                         help='saving path if save flag is set True')
     parser.add_argument('---theta_noise', type=float, default=0.15,
                         help='mean reversion rate of the noise (Ornstein Uhlenbeck)')
@@ -87,7 +87,7 @@ if __name__ == '__main__':
                  log=model_args['log'],
                  render=model_args['render'],
                  save=model_args['save'],
-                 save_path=model_args['path'])
+                 save_path=model_args['save_path'])
     if model_args['load'] is not None:
         model.load_model(model_args['load'])
     if model_args['train']:
