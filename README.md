@@ -21,8 +21,8 @@ The algorithms are intended for continuous gym environments !
 ### DDPG
  * **Usage with Ornstein-Uhlenbeck noise**
 
-    If you want to youse DDPG with our suggested Ornstein-Uhlenbeck noise 
-    you can do this via the _main_ddpg.py_
+    If you want to use DDPG with our suggested Ornstein-Uhlenbeck noise 
+    you can simply do this via the _main_ddpg.py_
         
     * Training on the Qube-v0 environment with default hyperparameters and 
     saving the model as _'furuta_model.pt'_ (saves by default as _ddpg_model.pt_).
@@ -33,7 +33,7 @@ The algorithms are intended for continuous gym environments !
         ```
     
     * Loading a saved model and evaluating it in the Qube-v0 environment.
-     Number of episodes and their length can be adapted with _--eval_episodes_
+     Number of episodes and their length for testing can be adapted with _--eval_episodes_
      and _--eval_ep_length_
     
         ```bash
@@ -52,7 +52,7 @@ The algorithms are intended for continuous gym environments !
    
    * Make sure the script is the same directory as the _ddpg_ package.
    * The noise should extend the _Noise_ class in _noise.py_ (contain a _reset_ and _iteration_ function) 
-   * Following example basicly does the same as the combination of the previous ones 
+   * Following example basicly does the same as the combination of the previous examples 
    (except that no model has to be loaded in, to load a model use _model.load(PATH)_) 
    
         ```python
@@ -61,11 +61,13 @@ The algorithms are intended for continuous gym environments !
     
         from ddpg import DDPG
         from ddpg import OrnsteinUhlenbeck
-
+     
+        # create environment and noise
         env = gym.make('Qube-v0')
         action_shape = env.action_space.shape[0] 
         noise = OrnsteinUhlenbeck(action_shape)
-   
+        
+        # setup a DDPG model w.r.t. the environment and self defined noise
         model = DDPG(env, noise, save_path="furuta_model.pt")
         model.train()
         model.eval(episodes=100, episode_length=500)     
@@ -80,15 +82,15 @@ The algorithms are intended for continuous gym environments !
 ### MPO
 ### Logging
 By default logging is enabled and safes the logs in the _runs/_ directory.
-Inspection them works by:
+Inspecting them works with:
 
 ```bash
 tensorboard --logdir=*/PATH/TO/runs*
 ```
-This starts a local server, which have to be accesed in the browser.
+This starts a local server, which can be accessed in the browser.
 Connecting to the server should result in something like this:
 
-![tensorboar](tensorboard.png)
+![tensorboar](data/tensorboard.png)
 
 ## Open Source Infos
 ### Contributing
