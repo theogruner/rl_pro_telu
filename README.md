@@ -7,7 +7,7 @@ control on [OpenAI gym](https://github.com/openai/gym) environments.
 To use the Algorithms will require python3 (>=3.6.5), OpenAI gym and the 
 Quanser environments.
 
-Installlation gym: https://github.com/openai/gym
+Installation gym: https://github.com/openai/gym
 
 Installation quanser: https://git.ias.informatik.tu-darmstadt.de/quanser/clients/tree/master
 

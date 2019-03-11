@@ -215,7 +215,7 @@ class DDPG(object):
             self.episode += 1
             if iteration % 3000 == 0:
                 if self.save:
-                    self.save_model(self.save_path)
+                    self.save_model(sf_path)
                 writer.add_scalar('data/mean_reward', summed_rew/3000, iteration)
                 writer.add_scalar('data/mean_q', summed_q/3000, iteration)
                 writer.add_scalar('data/mean_qloss', summed_qloss/3000, iteration)
