@@ -15,9 +15,80 @@ Additionally [PyTorch](https://pytorch.org), [Numpy](https://www.scipy.org/scipy
 [Tensorflow](https://www.tensorflow.org/install), 
 [TensorboardX](https://tensorboardx.readthedocs.io/en/latest/index.html) are needed.
 
-## Usage
+## Usage Examples
+### Note
+The algorithms are intended for continuous gym environments !
 ### DDPG
+ * **Usage with Ornstein-Uhlenbeck noise**
 
+    If you want to youse DDPG with our suggested Ornstein-Uhlenbeck noise 
+    you can do this via the _main_ddpg.py_
+        
+    * Training on the Qube-v0 environment with default hyperparameters and 
+    saving the model as _'furuta_model.pt'_ (saves by default as _ddpg_model.pt_).
+    Saving can be disabled with _--no-save_
+        
+        ```bash
+        python3 path/to/main_ddpg.py --env Qube-v0 --save_path furuta_model.pt
+        ```
+    
+    * Loading a saved model and evaluating it in the Qube-v0 environment.
+     Number of episodes and their length can be adapted with _--eval_episodes_
+     and _--eval_ep_length_
+    
+        ```bash
+        python3 path/to/main_ddpg.py --env Qube-v0 --no-train --eval --load furuta_model.pt
+        ```
+
+    * For more information, about adaptable hyperparameters, use:
+    
+        ```bash
+        python3 path/to/main_ddpg.py --help
+        ```
+    
+ * **Usage with self defined noise**
+ 
+   To use a self defined noise you need to write a script by yourself.
+   
+   * Make sure the script is the same directory as the _ddpg_ package.
+   * The noise should extend the _Noise_ class in _noise.py_ (contain a _reset_ and _iteration_ function) 
+   * Following example basicly does the same as the combination of the previous ones 
+   (except that no model has to be loaded in, to load a model use _model.load(PATH)_) 
+   
+        ```python
+        import gym    
+        import quanser_robots
+    
+        from ddpg import DDPG
+        from ddpg import OrnsteinUhlenbeck
+
+        env = gym.make('Qube-v0')
+        action_shape = env.action_space.shape[0] 
+        noise = OrnsteinUhlenbeck(action_shape)
+   
+        model = DDPG(env, noise, save_path="furuta_model.pt")
+        model.train()
+        model.eval(episodes=100, episode_length=500)     
+        ``` 
+ * **Setting Hyperparameters**
+ 
+    Setting hyperparameters would look something like this:
+    
+   ```python
+   model = DDPG(env, noise, gamma=0.5, tau=0.1, learning_rate=1e-2)
+   ```
+###MPO
+###Logging
+By default logging is enabled and safes the logs in the _runs/_ directory.
+Inspection them works by:
+
+```bash
+tensorboard --logdir=*/PATH/TO/runs*
+```
+This starts a local server, which have to be accesed in the browser.
+Connecting to the server should result in something like this:
+
+![tensorboar](tensorboard.png)
 
 ## Open Source Infos
 ### Contributing
