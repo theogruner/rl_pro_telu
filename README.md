@@ -3,7 +3,7 @@ Implementation of the Deep Deterministic Policy Gradient ([DDPG](https://arxiv.o
 Policy Optimization ([MPO](https://arxiv.org/abs/1806.06920)) Reinforcement Algorithms for continuous 
 control on [OpenAI gym](https://github.com/openai/gym) environments.
 
-##Prerequisites
+## Prerequisites
 To use the Algorithms will require python3 (>=3.6.5), OpenAI gym and the 
 Quanser environments.
 
@@ -15,8 +15,8 @@ Additionally [PyTorch](https://pytorch.org), [Numpy](https://www.scipy.org/scipy
 [Tensorflow](https://www.tensorflow.org/install), 
 [TensorboardX](https://tensorboardx.readthedocs.io/en/latest/index.html) are needed.
 
-##Usage
-###DDPG
+## Usage
+### DDPG
 
 
 ## Open Source Infos
