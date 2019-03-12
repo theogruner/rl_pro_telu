@@ -4,10 +4,10 @@ import numpy as np
 import gym
 import quanser_robots
 
-from .buffer import ReplayBuffer
-from .noise import OrnsteinUhlenbeck
-from .critic_torch import Critic
-from .actor_torch import Actor
+from ddpg.buffer import ReplayBuffer
+from ddpg.noise import OrnsteinUhlenbeck
+from ddpg.critic_torch import Critic
+from ddpg.actor_torch import Actor
 
 from tensorboardX import SummaryWriter
 
@@ -41,7 +41,8 @@ class DDPG(object):
         self.env = env
         self.state_shape = self.env.observation_space.shape[0]
         self.action_shape = self.env.action_space.shape[0]
-        self.action_range = env.action_space.high[0]
+        self.action_range = env.action_space.high[0] if self.action_shape == 1\
+            else env.action_space.high
         # initialize noise/buffer/loss
         self.noise = noise if noise is not None else OrnsteinUhlenbeck(self.action_shape)
         self.buffer = ReplayBuffer(buffer_capacity)
@@ -104,8 +105,8 @@ class DDPG(object):
                  (target policy without noise if not training)
         """
         obs = torch.tensor(observation).float()
-        a = self.actor(obs).detach().numpy()
-        a = a + self.noise.iteration() if train else self.target_actor(obs).detach().numpy()
+        a = self.actor(obs).detach().numpy() + self.noise.iteration() if train \
+            else self.target_actor(obs).detach().numpy()
         a = a * self.action_range
         a = np.clip(a, a_min=-self.action_range,
                     a_max=self.action_range)
@@ -149,7 +150,7 @@ class DDPG(object):
         """
         rend = render if render is not None else self.render
         sf = save if save is not None else self.save
-        sf_path = save_path if save_path is not None else self.save_path
+        sv_path = save_path if save_path is not None else self.save_path
         ep = episodes if episodes is not None else self.episodes
         it = episode_length if episode_length is not None else self.episode_length
 
@@ -168,20 +169,22 @@ class DDPG(object):
 
             for t in range(1, it + 1):
                 # logging
-                if iteration % 3000 == 0:
-                    summed_rew = 0
-                    summed_q = 0
-                    summed_qloss = 0
+                if log_f:
+                    if iteration % 3000 == 0:
+                        summed_rew = 0
+                        summed_q = 0
+                        summed_qloss = 0
                 # choose action and execute it
                 action = self._select_action(observation)
                 new_observation, reward, done, _ = self.env.step(action)
                 if rend is True:
                     self.env.render()
                 # logging
-                summed_rew += reward
-                summed_q += self.critic.log(torch.tensor(observation).float(),
-                                            torch.tensor(action).float()).detach().item()
-                iteration += 1
+                if log_f:
+                    summed_rew += reward
+                    summed_q += self.critic.log(torch.tensor(observation).float(),
+                                                torch.tensor(action).float()).detach().item()
+                    iteration += 1
 
                 # push transition onto the buffer
                 self.buffer.push(observation, action, reward, new_observation)
@@ -197,7 +200,8 @@ class DDPG(object):
                 self.critic_optimizer.zero_grad()
                 target = self.critic(state_batch, action_batch)
                 loss_critic = self.loss(y, target)
-                summed_qloss += loss_critic         # logging
+                if log_f:
+                    summed_qloss += loss_critic         # logging
                 loss_critic.backward()
                 self.critic_optimizer.step()
 
@@ -214,16 +218,18 @@ class DDPG(object):
             # logging
             self.episode += 1
             if iteration % 3000 == 0:
-                if self.save:
-                    self.save_model(sf_path)
-                writer.add_scalar('data/mean_reward', summed_rew/3000, iteration)
-                writer.add_scalar('data/mean_q', summed_q/3000, iteration)
-                writer.add_scalar('data/mean_qloss', summed_qloss/3000, iteration)
+                if sf:
+                    self.save_model(sv_path)
+                if log_f:
+                    writer.add_scalar('data/mean_reward', summed_rew/3000, iteration)
+                    writer.add_scalar('data/mean_q', summed_q/3000, iteration)
+                    writer.add_scalar('data/mean_qloss', summed_qloss/3000, iteration)
             print("episode " + str(episode+1) + " of " + str(ep))
 
-        writer.close()
+        if log_f:
+            writer.close()
         if sf is True:
-            self.save_model(sf_path)
+            self.save_model(sv_path)
 
 
     # TODO eval

@@ -2,11 +2,17 @@ import argparse
 
 import gym
 import quanser_robots
-from .noise import OrnsteinUhlenbeck
-from .ddpg import DDPG
+from ddpg import OrnsteinUhlenbeck
+from ddpg import DDPG
 
 
 def _add_bool_arg(parser, name, default=False):
+    """
+    Adds a boolean argument to the parser
+    :param parser: (ArgumentParser) the parser the arguments should be added to
+    :param name: (str) name of the argument
+    :param default: (bool) default value of the argument
+    """
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument('--' + name, dest=name, action='store_true')
     group.add_argument('--no-' + name, dest=name, action='store_false')
@@ -14,6 +20,10 @@ def _add_bool_arg(parser, name, default=False):
 
 
 def _parse():
+    """
+    initialize the argument parser and parse the arguments
+    :return: the dict version of the parsers output
+    """
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      description='Train a ddpg model with an Ornstein Uhlenbeck noise')
 
