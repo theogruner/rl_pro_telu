@@ -33,7 +33,7 @@ class DDPG(object):
     :param save_path: (str) path for saving and loading a model
 
     """
-    def __init__(self, env, noise=None, buffer_capacity=1e6, batch_size=64,
+    def __init__(self, env, noise=None, buffer_capacity=int(1e6), batch_size=64,
                  gamma=0.99, tau=0.001, episodes=int(1e4), learning_rate=1e-3,
                  episode_length=3000, actor_layers=None, critic_layers=None,
                  log=True, log_name=None, render=True, save=True, save_path="ddpg_model.pt"):
@@ -106,8 +106,8 @@ class DDPG(object):
                  (target policy without noise if not training)
         """
         obs = torch.tensor(observation).float()
-        a = self.actor(obs).detach().numpy() + self.noise.iteration() if train \
-            else self.target_actor(obs).detach().numpy()
+        a = self.actor.eval(obs).detach().numpy() + self.noise.iteration() if train \
+            else self.eval(obs).detach().numpy()
         a = a * self.action_range
         a = np.clip(a, a_min=-self.action_range,
                     a_max=self.action_range)
@@ -163,7 +163,7 @@ class DDPG(object):
                 writer = SummaryWriter("runs/" + log_name) if log_name is not None \
                     else SummaryWriter()
             else:
-                writer = SummaryWriter()
+                writer = SummaryWriter("runs/" + self.log_name)
 
             # summed_rew = 0
             # summed_q = 0
@@ -232,14 +232,25 @@ class DDPG(object):
             # logging
             if log_f:
                 writer.add_scalar('data/rew_per_ep', reward_per_episode,
-                                  episode)
+                                  episode+1)
                 writer.add_scalar('data/mean_reward_per_ep', reward_per_episode / it,
-                                  episode)
+                                  episode+1)
                 writer.add_scalar('data/mean_q_per_ep', q_per_ep / it,
-                                  episode)
+                                  episode+1)
                 writer.add_scalar('data/mean_qloss_per_ep', qloss_per_ep / it,
-                                  episode)
+                                  episode+1)
+                reward_target = 0
+                state = self.env.reset()
+                for log_i in range(it):
+                    act = self._select_action(state, train=False)
+                    next_s, rew, _, _ = self.env.step(act)
+                    reward_target += rew
+                writer.add_scalar('target/rew_per_ep', reward_target,
+                                  episode+1)
+
             self.episode += 1
+            if sf:
+                self.save_model(sv_path)
             # if iteration % 3000 == 0:
              #   if sf:
              #       self.save_model(sv_path)
@@ -266,7 +277,7 @@ class DDPG(object):
                  with Format (rewards, mean reward w.r.t. all previous rewards, mean q-value w.r.t. all previous episodes)
         """
         # self.actor.eval()
-        # reward = []
+        # reward = 0
         # mean_reward = []
         # mean_q = []
         for episode in range(episodes):
