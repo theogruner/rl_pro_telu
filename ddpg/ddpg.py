@@ -155,10 +155,10 @@ class DDPG(object):
         it = episode_length if episode_length is not None else self.episode_length
 
         # initialize logging
+        iteration = 0
         log_f = log if log is not None else self.log
         if log_f:
             writer = SummaryWriter()
-            iteration = 0
             summed_rew = 0
             summed_q = 0
             summed_qloss = 0
@@ -184,7 +184,7 @@ class DDPG(object):
                     summed_rew += reward
                     summed_q += self.critic.log(torch.tensor(observation).float(),
                                                 torch.tensor(action).float()).detach().item()
-                    iteration += 1
+                iteration += 1
 
                 # push transition onto the buffer
                 self.buffer.push(observation, action, reward, new_observation)
