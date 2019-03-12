@@ -55,6 +55,8 @@ def _parse():
     parser.add_argument('--critic_layers', type=tuple, default=(400, 300),
                         help='size of the critic network layers')
     _add_bool_arg(parser, 'log', default=True)
+    parser.add_argument('--log_name', type=str, default=None,
+                        help='name of the log file')
     _add_bool_arg(parser, 'render', default=True)
     _add_bool_arg(parser, 'save', default=True)
     parser.add_argument('--load', type=str, default=None,
@@ -95,6 +97,7 @@ if __name__ == '__main__':
                  actor_layers=model_args['actor_layers'],
                  critic_layers=model_args['critic_layers'],
                  log=model_args['log'],
+                 log_name=model_args['log_name'],
                  render=model_args['render'],
                  save=model_args['save'],
                  save_path=model_args['save_path'])

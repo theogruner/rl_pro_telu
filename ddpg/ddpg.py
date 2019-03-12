@@ -36,7 +36,7 @@ class DDPG(object):
     def __init__(self, env, noise=None, buffer_capacity=1e6, batch_size=64,
                  gamma=0.99, tau=0.001, episodes=int(1e4), learning_rate=1e-3,
                  episode_length=3000, actor_layers=None, critic_layers=None,
-                 log=True, render=True, save=True, save_path="ddpg_model.pt"):
+                 log=True, log_name=None, render=True, save=True, save_path="ddpg_model.pt"):
         # initialize env and read out shapes
         self.env = env
         self.state_shape = self.env.observation_space.shape[0]
@@ -78,6 +78,7 @@ class DDPG(object):
         # control/log variables or flags
         self.episode = 0
         self.log = log
+        self.log_name = log_name
         self.render = render
         self.save = save
         self.save_path = save_path
@@ -138,7 +139,7 @@ class DDPG(object):
                                        self.actor.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
 
-    def train(self, episodes=None, episode_length=None, render=None, save=None, save_path=None, log=None):
+    def train(self, episodes=None, episode_length=None, render=None, save=None, save_path=None, log=None, log_name=None):
         """
         trains the model
         :param episodes: (int) number of episodes to make
@@ -155,25 +156,34 @@ class DDPG(object):
         it = episode_length if episode_length is not None else self.episode_length
 
         # initialize logging
-        iteration = 0
+        # iteration = 0
         log_f = log if log is not None else self.log
         if log_f:
-            writer = SummaryWriter()
-            summed_rew = 0
-            summed_q = 0
-            summed_qloss = 0
+            if self.log_name is None:
+                writer = SummaryWriter("runs/" + log_name) if log_name is not None \
+                    else SummaryWriter()
+            else:
+                writer = SummaryWriter()
+
+            # summed_rew = 0
+            # summed_q = 0
+            # summed_qloss = 0
 
         for episode in range(0, ep):
             self.noise.reset()
             observation = self.env.reset()
+            if log_f:
+                reward_per_episode = 0
+                q_per_ep = 0
+                qloss_per_ep = 0
 
             for t in range(1, it + 1):
                 # logging
-                if log_f:
-                    if iteration % 3000 == 0:
-                        summed_rew = 0
-                        summed_q = 0
-                        summed_qloss = 0
+                # if log_f:
+                    # if iteration % 3000 == 0:
+                    #     summed_rew = 0
+                    #     summed_q = 0
+                    #     summed_qloss = 0
                 # choose action and execute it
                 action = self._select_action(observation)
                 new_observation, reward, done, _ = self.env.step(action)
@@ -181,10 +191,13 @@ class DDPG(object):
                     self.env.render()
                 # logging
                 if log_f:
-                    summed_rew += reward
-                    summed_q += self.critic.log(torch.tensor(observation).float(),
+                    reward_per_episode += reward
+                    q_per_ep += self.critic.log(torch.tensor(observation).float(),
                                                 torch.tensor(action).float()).detach().item()
-                iteration += 1
+                    # summed_rew += reward
+                    # summed_q += self.critic.log(torch.tensor(observation).float(),
+                    #                             torch.tensor(action).float()).detach().item()
+                # iteration += 1
 
                 # push transition onto the buffer
                 self.buffer.push(observation, action, reward, new_observation)
@@ -201,7 +214,8 @@ class DDPG(object):
                 target = self.critic(state_batch, action_batch)
                 loss_critic = self.loss(y, target)
                 if log_f:
-                    summed_qloss += loss_critic         # logging
+                    qloss_per_ep += loss_critic  # logging
+                    # summed_qloss += loss_critic         # logging
                 loss_critic.backward()
                 self.critic_optimizer.step()
 
@@ -216,14 +230,23 @@ class DDPG(object):
                 self._soft_update()
 
             # logging
+            if log_f:
+                writer.add_scalar('data/rew_per_ep', reward_per_episode,
+                                  episode)
+                writer.add_scalar('data/mean_reward_per_ep', reward_per_episode / it,
+                                  episode)
+                writer.add_scalar('data/mean_q_per_ep', q_per_ep / it,
+                                  episode)
+                writer.add_scalar('data/mean_qloss_per_ep', qloss_per_ep / it,
+                                  episode)
             self.episode += 1
-            if iteration % 3000 == 0:
-                if sf:
-                    self.save_model(sv_path)
-                if log_f:
-                    writer.add_scalar('data/mean_reward', summed_rew/3000, iteration)
-                    writer.add_scalar('data/mean_q', summed_q/3000, iteration)
-                    writer.add_scalar('data/mean_qloss', summed_qloss/3000, iteration)
+            # if iteration % 3000 == 0:
+             #   if sf:
+             #       self.save_model(sv_path)
+             #   if log_f:
+             #       writer.add_scalar('data/mean_reward', summed_rew/3000, iteration)
+             #       writer.add_scalar('data/mean_q', summed_q/3000, iteration)
+             #       writer.add_scalar('data/mean_qloss', summed_qloss/3000, iteration)
             print("episode " + str(episode+1) + " of " + str(ep))
 
         if log_f:
