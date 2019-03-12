@@ -82,6 +82,7 @@ The algorithms are intended for continuous gym environments !
 ### MPO
 ### Logging
 By default logging is enabled and safes the logs in the _runs/_ directory.
+Name of the logs can be set by the *log_name* parameter (*--log_name* argument).
 Inspecting them works with:
 
 ```bash
