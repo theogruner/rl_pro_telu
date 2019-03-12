@@ -8,8 +8,8 @@ class Actor(nn.Module):
     """
     Policy network
     :param env: gym environment for state and action shapes
-    :param layer1: (int) size of the first hidden layer (default = 200)
-    :param layer2: (int) size of the first hidden layer (default = 200)
+    :param layer1: (int) size of the first hidden layer (default = 100)
+    :param layer2: (int) size of the first hidden layer (default = 100)
     """
     def __init__(self, env, layer1=100, layer2=100):
         super(Actor, self).__init__()
@@ -56,6 +56,16 @@ class Actor(nn.Module):
             mean, cholesky = self.forward(state)
             action_distribution = MultivariateNormal(mean, scale_tril=cholesky)
             action = action_distribution.sample()
+        return action
+
+    def eval_step(self, state):
+        """
+        Approximates an action based on the mean output of the network
+        :param state: (State) a state of  the environment
+        :return: (float) an action of the action space
+        """
+        with torch.no_grad():
+            action, _ = self.forward(state)
         return action
 
     def to_cholesky_matrix(self, cholesky_vector):
