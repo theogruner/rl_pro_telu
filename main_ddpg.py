@@ -2,7 +2,7 @@ import argparse
 
 import gym
 import quanser_robots
-from ddpg import OrnsteinUhlenbeck
+from ddpg import OrnsteinUhlenbeck, AdaptiveParameter
 from ddpg import DDPG
 
 
@@ -63,6 +63,8 @@ def _parse():
                         help='loading path if given')
     parser.add_argument('--save_path', type=str, default='ddpg_model.pt',
                         help='saving path if save flag is set True')
+    parser.add_argument('--noise', type=str, default='OUnoise',
+                        help='noise type, (OUnoise, AdaptiveParam)')
     parser.add_argument('---theta_noise', type=float, default=0.15,
                         help='mean reversion rate of the noise (Ornstein Uhlenbeck)')
     parser.add_argument('---mu_noise', type=float, default=0.0,
@@ -80,13 +82,17 @@ def _parse():
 if __name__ == '__main__':
     model_args = _parse()
     env = gym.make(model_args['env'])
-    noise = OrnsteinUhlenbeck(action_shape=env.action_space.shape[0],
-                              theta=model_args['theta_noise'],
-                              mu=model_args['mu_noise'],
-                              sigma=model_args['sigma_noise'],
-                              x_start=model_args['x_start_noise'])
+    if model_args['noise'] is 'OUnoise':
+        noise = OrnsteinUhlenbeck(action_shape=env.action_space.shape[0],
+                                  theta=model_args['theta_noise'],
+                                  mu=model_args['mu_noise'],
+                                  sigma=model_args['sigma_noise'],
+                                  x_start=model_args['x_start_noise'])
+    else:
+        noise = AdaptiveParameter()
 
     model = DDPG(env, noise,
+                 noise_name=model_args['noise'],
                  buffer_capacity=model_args['buffer_capacity'],
                  batch_size=model_args['batch_size'],
                  gamma=model_args['gamma'],

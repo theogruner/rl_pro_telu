@@ -5,7 +5,7 @@ import gym
 import quanser_robots
 
 from ddpg.buffer import ReplayBuffer
-from ddpg.noise import OrnsteinUhlenbeck
+from ddpg.noise import OrnsteinUhlenbeck, AdaptiveParameter
 from ddpg.critic_torch import Critic
 from ddpg.actor_torch import Actor
 
@@ -33,7 +33,7 @@ class DDPG(object):
     :param save_path: (str) path for saving and loading a model
 
     """
-    def __init__(self, env, noise=None, buffer_capacity=int(1e6), batch_size=64,
+    def __init__(self, env, noise=None, noise_name=None, buffer_capacity=int(1e6), batch_size=64,
                  gamma=0.99, tau=0.001, episodes=int(1e4), learning_rate=1e-3,
                  episode_length=3000, actor_layers=None, critic_layers=None,
                  log=True, log_name=None, render=True, save=True, save_path="ddpg_model.pt"):
@@ -45,6 +45,7 @@ class DDPG(object):
             else env.action_space.high
         # initialize noise/buffer/loss
         self.noise = noise if noise is not None else OrnsteinUhlenbeck(self.action_shape)
+        self.noise_name = noise_name if noise_name is not None else 'OUnoise'
         self.buffer = ReplayBuffer(buffer_capacity)
         self.loss = nn.MSELoss()
         # initialize hyperparameters
@@ -64,6 +65,9 @@ class DDPG(object):
             if actor_layers is not None else Critic(self.state_shape, self.action_shape)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=learning_rate)
+        # fill buffer with random transitions and init norm layers
+        self._random_trajectory(self.batch_size)
+        # copy parameters to target networks
         for target_param, param in zip(self.target_actor.parameters(),
                                        self.actor.parameters()):
             target_param.data.copy_(param.data)
@@ -73,8 +77,6 @@ class DDPG(object):
                                        self.critic.parameters()):
             target_param.data.copy_(param.data)
             target_param.requires_grad = False
-        # fill buffer with random transitions
-        self._random_trajectory(self.batch_size)
         # control/log variables or flags
         self.episode = 0
         self.log = log
@@ -96,6 +98,9 @@ class DDPG(object):
             observation = new_observation
             if done:
                 observation = self.env.reset()
+        states, actions, _, _ = self._sample_batches(self.batch_size)
+        self.actor(states)
+        self.critic(states, actions)
 
     def _select_action(self, observation, train=True):
         """
@@ -106,8 +111,8 @@ class DDPG(object):
                  (target policy without noise if not training)
         """
         obs = torch.tensor(observation).float()
-        a = self.actor.eval(obs).detach().numpy() + self.noise.iteration() if train \
-            else self.eval(obs).detach().numpy()
+        a = self.actor.eval(obs).detach().numpy() + self.noise.get_noise() if train \
+            else self.actor.eval(obs).detach().numpy()
         a = a * self.action_range
         a = np.clip(a, a_min=-self.action_range,
                     a_max=self.action_range)
@@ -170,7 +175,7 @@ class DDPG(object):
             # summed_qloss = 0
 
         for episode in range(0, ep):
-            self.noise.reset()
+            self.noise.reset()  # TODO: maybe not for Adaptive Param noise??
             observation = self.env.reset()
             if log_f:
                 reward_per_episode = 0
@@ -208,7 +213,9 @@ class DDPG(object):
                     self._sample_batches(self.batch_size)
 
                 # update critic
-                y = reward_batch + self.gamma * self.target_critic(next_state_batch, self.target_actor(next_state_batch))
+                with torch.no_grad():
+                    target_action = self.target_actor(next_state_batch)
+                y = reward_batch + self.gamma * self.target_critic(next_state_batch, target_action)
 
                 self.critic_optimizer.zero_grad()
                 target = self.critic(state_batch, action_batch)
@@ -221,13 +228,20 @@ class DDPG(object):
 
                 # update actor
                 self.actor_optimizer.zero_grad()
-                loss_actor = self.critic(state_batch, self.actor(state_batch))
+                sample_action = self.actor(state_batch)
+                loss_actor = self.critic(state_batch, sample_action)
                 loss_actor = -loss_actor.mean()
                 loss_actor.backward()
                 self.actor_optimizer.step()
 
                 # update parameter
                 self._soft_update()
+
+                if self.noise_name is 'AdaptiveParam':
+                    distance = self.loss(target_action, sample_action)
+                    self.noise.set_distance()
+                self.noise.iteration()
+
 
             # logging
             if log_f:

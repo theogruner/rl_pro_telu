@@ -44,10 +44,11 @@ class OrnsteinUhlenbeck(Noise):
         make a time-step in the Ornstein Uhlenbeck process
         :return: the current noise value
         """
-        x = self.x
         self.x = self.x + self.theta*(self.mu - self.x)*self.delta_t \
-                 + self.sigma * self._wiener_process()
-        return x
+            + self.sigma * self._wiener_process()
+
+    def get_noise(self):
+        return self.x
 
     def reset(self):
         """
@@ -61,3 +62,31 @@ class OrnsteinUhlenbeck(Noise):
         :return: a random value in shape of the given action shape
         """
         return np.sqrt(self.delta_t) * np.random.normal(size=self.mu.shape)
+
+
+class AdaptiveParameter(Noise):
+    """
+    Adaptive Parameter noise
+    """
+    def __init__(self, initial_std=0.1, threshold=0.1,
+                 scaling_factor=1.01, init_distance=0):
+        self.initial_std = initial_std
+        self.threshold = threshold
+        self.alpha = scaling_factor
+        self.std = initial_std
+        self.distance = init_distance
+
+    def set_distance(self, distance):
+        self.distance = distance
+
+    def iteration(self):
+        if self.distance <= self.threshold:
+            self.std *= self.alpha
+        else:
+            self.std /= self.alpha
+
+    def get_noise(self):
+        return self.std
+
+    def reset(self):
+        self.std = self.initial_std
