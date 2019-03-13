@@ -96,8 +96,8 @@ class DDPG(object):
             new_observation, reward, done, _ = self.env.step(action)
             self.buffer.push(observation, action, reward, new_observation)
             observation = new_observation
-            if done:
-                observation = self.env.reset()
+            #if done:
+            #observation = self.env.reset()
 
     def _select_action(self, observation, train=True):
         """
@@ -195,8 +195,7 @@ class DDPG(object):
                     self._sample_batches(self.batch_size)
 
                 # update critic
-                with torch.no_grad():
-                    target_action = self.target_actor(next_state_batch)
+                target_action = self.target_actor(next_state_batch)
                 y = reward_batch + self.gamma * self.target_critic(next_state_batch, target_action)
 
                 self.critic_optimizer.zero_grad()
@@ -236,7 +235,7 @@ class DDPG(object):
                                   episode+1)
                 reward_target = 0
                 state = self.env.reset()
-                for log_i in range(it):
+                for log_i in range(0, it):
                     act = self._select_action(state, train=False)
                     next_s, rew, _, _ = self.env.step(act)
                     reward_target += rew

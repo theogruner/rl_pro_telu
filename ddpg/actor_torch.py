@@ -55,7 +55,7 @@ class Actor(nn.Module):
         #x = F.batch_norm(self.lin2(x),
         #                 self.norm2.running_mean,
         #                 self.norm2.running_var)
-        x=self.lin2(x)
+        x = self.lin2(x)
         x = F.relu(x)
         x = torch.tanh(self.lin3(x))
         return x#[0]
