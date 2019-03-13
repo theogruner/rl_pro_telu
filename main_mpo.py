@@ -61,13 +61,12 @@ def _parse():
     parser.add_argument('--log_dir', type=str, default=None,
                         help='save log if safe log flag is set')
     _add_bool_arg(parser, 'save', default=True)
-    _add_bool_arg(parser, 'load', default=False)
+    parser.add_argument('--save_path', type=str, default='mpo_model.pt',
+                        help='saving path if safe flag is set')
     # parser.add_argument('--safe', type=bool, default=True,
     #                     help='flag if to safe the model')
-    # parser.add_argument('--load', type=bool, default=False,
-    #                     help='flag if to load a model')
-    parser.add_argument('--path', type=str, default='mpo_model.pt',
-                        help='saving (loading) path if safe (load) flag is set')
+    parser.add_argument('--load', type=str, default=None,
+                        help='loading path if given')
 
     args = parser.parse_args()
     d_args = vars(args)
@@ -94,10 +93,10 @@ if __name__ == '__main__':
                 log=model_args['log'],
                 log_dir=model_args['log_dir'],
                 render=model_args['render'],
-                safe=model_args['save'],
-                safe_path=model_args['path'])
-    if model_args['load']:
-        model.load_model(model_args['path'])
+                save=model_args['save'],
+                save_path=model_args['path'])
+    if model_args['load'] is not None:
+        model.load_model(model_args['load'])
     if model_args['train']:
         model.train()
     if model_args['eval']:
