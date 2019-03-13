@@ -65,7 +65,7 @@ class DDPG(object):
             if actor_layers is not None else Critic(self.state_shape, self.action_shape)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=learning_rate)
-        # fill buffer with random transitions and init norm layers
+        # fill buffer with random transitions
         self._random_trajectory(self.batch_size)
         # copy parameters to target networks
         for target_param, param in zip(self.target_actor.parameters(),
@@ -98,9 +98,6 @@ class DDPG(object):
             observation = new_observation
             if done:
                 observation = self.env.reset()
-        states, actions, _, _ = self._sample_batches(self.batch_size)
-        self.actor(states)
-        self.critic(states, actions)
 
     def _select_action(self, observation, train=True):
         """
@@ -161,20 +158,15 @@ class DDPG(object):
         it = episode_length if episode_length is not None else self.episode_length
 
         # initialize logging
-        # iteration = 0
         log_f = log if log is not None else self.log
+        log_n = log_name if log_name is not None else self.log_name
         if log_f:
-            if self.log_name is None:
-                writer = SummaryWriter("runs/" + log_name) if log_name is not None \
-                    else SummaryWriter()
-            else:
-                writer = SummaryWriter("runs/" + self.log_name)
-
-            # summed_rew = 0
-            # summed_q = 0
-            # summed_qloss = 0
+            writer = SummaryWriter("runs/" + log_n) if log_n is not None \
+                else SummaryWriter()
 
         for episode in range(0, ep):
+            if self.episode != 0:
+                episode = self.episode
             self.noise.reset()  # TODO: maybe not for Adaptive Param noise??
             observation = self.env.reset()
             if log_f:
@@ -183,12 +175,6 @@ class DDPG(object):
                 qloss_per_ep = 0
 
             for t in range(1, it + 1):
-                # logging
-                # if log_f:
-                    # if iteration % 3000 == 0:
-                    #     summed_rew = 0
-                    #     summed_q = 0
-                    #     summed_qloss = 0
                 # choose action and execute it
                 action = self._select_action(observation)
                 new_observation, reward, done, _ = self.env.step(action)
@@ -199,10 +185,6 @@ class DDPG(object):
                     reward_per_episode += reward
                     q_per_ep += self.critic.log(torch.tensor(observation).float(),
                                                 torch.tensor(action).float()).detach().item()
-                    # summed_rew += reward
-                    # summed_q += self.critic.log(torch.tensor(observation).float(),
-                    #                             torch.tensor(action).float()).detach().item()
-                # iteration += 1
 
                 # push transition onto the buffer
                 self.buffer.push(observation, action, reward, new_observation)
@@ -220,9 +202,8 @@ class DDPG(object):
                 self.critic_optimizer.zero_grad()
                 target = self.critic(state_batch, action_batch)
                 loss_critic = self.loss(y, target)
-                if log_f:
-                    qloss_per_ep += loss_critic  # logging
-                    # summed_qloss += loss_critic         # logging
+                if log_f:                        # logging
+                    qloss_per_ep += loss_critic
                 loss_critic.backward()
                 self.critic_optimizer.step()
 
