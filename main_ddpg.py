@@ -82,7 +82,7 @@ def _parse():
 if __name__ == '__main__':
     model_args = _parse()
     env = gym.make(model_args['env'])
-    if model_args['noise'] is 'OUnoise':
+    if model_args['noise'] == 'OUnoise':
         noise = OrnsteinUhlenbeck(action_shape=env.action_space.shape[0],
                                   theta=model_args['theta_noise'],
                                   mu=model_args['mu_noise'],

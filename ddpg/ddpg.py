@@ -74,7 +74,7 @@ class DDPG(object):
             target_param.data.copy_(param.data)
             target_param.requires_grad = False
 
-        # perturbed actor
+        # perturbed actor for ParameterNoise
         if noise_name == 'AdaptiveParam':
             self.perturbed_actor = Actor(self.state_shape, self.action_shape, layer1=actor_layers[0],
                                          layer2=actor_layers[1]) \
@@ -112,8 +112,8 @@ class DDPG(object):
             new_observation, reward, done, _ = self.env.step(action)
             self.buffer.push(observation, action, reward, new_observation)
             observation = new_observation
-            #if done:
-            #observation = self.env.reset()
+            if done:
+                observation = self.env.reset()
 
     def _select_action(self, observation, train=True):
         """
@@ -123,12 +123,19 @@ class DDPG(object):
         :return: (Action) the action taken following the policy plus noise
                  (target policy without noise if not training)
         """
-        obs = torch.tensor(observation).float()
+        self.actor.eval()
+        self.target_actor.eval()
+        obs = torch.tensor([observation]).float()
         if self.noise_name == 'AdaptiveParam':
-            a = self.perturbed_actor.evex(obs).detach().numpy()
+            self.perturbed_actor.eval()
+            a = self.perturbed_actor(obs)[0].detach().numpy() if train \
+                else self.target_actor(obs)[0].detach().numpy()
+            self.perturbed_actor.train()
         else:
-            a = self.actor.evex(obs).detach().numpy() + self.noise.get_noise() if train \
-                else self.actor.evex(obs).detach().numpy()
+            a = self.actor(obs)[0].detach().numpy() + self.noise.get_noise() if train \
+                else self.target_actor(obs)[0].detach().numpy()
+        self.actor.train()
+        self.target_actor.train()
         a = a * self.action_range
         a = np.clip(a, a_min=-self.action_range,
                     a_max=self.action_range)
@@ -234,8 +241,10 @@ class DDPG(object):
                 loss_actor.backward()
                 self.actor_optimizer.step()
 
-                # update parameter
+                # update target_networks
                 self._soft_update()
+
+                # update noisy actor parameters
                 if self.noise_name == 'AdaptiveParam':
                     pert_action = self.perturbed_actor(state_batch)
                     distance = self.loss(pert_action, sample_action)
@@ -271,13 +280,6 @@ class DDPG(object):
             self.episode += 1
             if sf:
                 self.save_model(sv_path)
-            # if iteration % 3000 == 0:
-             #   if sf:
-             #       self.save_model(sv_path)
-             #   if log_f:
-             #       writer.add_scalar('data/mean_reward', summed_rew/3000, iteration)
-             #       writer.add_scalar('data/mean_q', summed_q/3000, iteration)
-             #       writer.add_scalar('data/mean_qloss', summed_qloss/3000, iteration)
             print("episode " + str(episode+1) + " of " + str(ep))
 
         if log_f:
@@ -306,8 +308,7 @@ class DDPG(object):
             # mean_reward_e = []
             # mean_q_e = []
             for step in range(episode_length):
-                state = torch.tensor(observation).float()
-                action = self._select_action(state, train=False)
+                action = self._select_action(observation, train=False)
                 # obs = torch.tensor(observation).float()
                 # q = self.critic.eval(state, action).item()
                 # mean_q_e.append(q)

@@ -13,9 +13,9 @@ class Critic(nn.Module):
     """
     def __init__(self, state_shape, action_shape, layer1=400, layer2=300):
         super(Critic, self).__init__()
-        # self.state_norm = nn.BatchNorm1d(state_shape)
+        self.state_norm = nn.BatchNorm1d(state_shape)
         self.lin1 = nn.Linear(state_shape, layer1, True)
-        # self.norm1 = nn.BatchNorm1d(layer1)
+        self.norm1 = nn.BatchNorm1d(layer1)
         self.lin2 = nn.Linear(layer1 + action_shape, layer2, True)
         self.lin3 = nn.Linear(layer2, 1, True)
 
@@ -27,9 +27,9 @@ class Critic(nn.Module):
         :return: (float) output of the network(= Q-value for the given
                   state-action pair)
         """
-        # s = self.state_norm(state)
-        # x = self.norm1(self.lin1(s))
-        x = self.lin1(state)
+        s = self.state_norm(state)
+        x = self.norm1(self.lin1(s))
+        #x = self.lin1(state)
         x = F.relu(x)
         x = F.relu(self.lin2(torch.cat((x, action), 1)))
         x = self.lin3(x)
@@ -43,14 +43,14 @@ class Critic(nn.Module):
         :return: (float) output of the network(= Q-value for the given
                   state-action pair)
         """
-        # s = F.batch_norm(torch.tensor([state.numpy()]),
-        #                 self.state_norm.running_mean,
-        #                 self.state_norm.running_var)
-        # x = F.batch_norm(self.lin1(s),
-        #                 self.norm1.running_mean,
-        #                 self.norm1.running_var)
-        x = self.lin1(state)
+        s = F.batch_norm(torch.tensor([state.numpy()]),
+                         self.state_norm.running_mean,
+                         self.state_norm.running_var)
+        x = F.batch_norm(self.lin1(s),
+                         self.norm1.running_mean,
+                         self.norm1.running_var)
+        #x = self.lin1(state)
         x = F.relu(x)
         x = F.relu(self.lin2(torch.cat((x.squeeze(), action), 0)))
         x = self.lin3(x)
-        return x#[0]
+        return x[0]
