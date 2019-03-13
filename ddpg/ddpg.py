@@ -111,8 +111,8 @@ class DDPG(object):
                  (target policy without noise if not training)
         """
         obs = torch.tensor(observation).float()
-        a = self.actor.eval(obs).detach().numpy() + self.noise.get_noise() if train \
-            else self.actor.eval(obs).detach().numpy()
+        a = self.actor.evex(obs).detach().numpy() + self.noise.get_noise() if train \
+            else self.actor.evex(obs).detach().numpy()
         a = a * self.action_range
         a = np.clip(a, a_min=-self.action_range,
                     a_max=self.action_range)
@@ -239,7 +239,7 @@ class DDPG(object):
 
                 if self.noise_name is 'AdaptiveParam':
                     distance = self.loss(target_action, sample_action)
-                    self.noise.set_distance()
+                    self.noise.set_distance(distance)
                 self.noise.iteration()
 
 

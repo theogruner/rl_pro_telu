@@ -37,7 +37,7 @@ class Actor(nn.Module):
         x = torch.tanh(self.lin3(x))
         return x
 
-    def eval(self, state):
+    def evex(self, state):
         """
         Forward function for evaluation and exploration
         :param state: (State) a state of the environment
