@@ -286,7 +286,7 @@ class MPO(object):
                         # action_q = sample_π * exp_Q / normalization
 
                         additional_logprob = []
-                        if self.M ==1:
+                        if self.M == 1:
                             additional_logprob = π.log_prob(action_q)
                         else:
                             for column in range(self.M):
@@ -315,6 +315,11 @@ class MPO(object):
 
                         self.η_μ -= self.α * (self.ε_μ - C_μ).detach().item()
                         self.η_Σ -= self.α * (self.ε_Σ - C_Σ).detach().item()
+
+                        if self.η_μ < 0:
+                            self.η_μ = 0
+                        if self.η_Σ < 0:
+                            self.η_Σ = 0
 
                         self.actor_optimizer.zero_grad()
                         loss_policy = -(

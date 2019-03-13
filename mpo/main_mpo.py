@@ -32,9 +32,9 @@ def _parse():
                         help='length of an evaluation episode')
     parser.add_argument('--eps', type=float, default=0.1,
                         help='hard constraint of the E-step')
-    parser.add_argument('--eps_mean', type=float, default=5e-4,
+    parser.add_argument('--eps_mean', type=float, default=0.1,
                         help='hard constraint on C_mu')
-    parser.add_argument('--eps_sigma', type=float, default=1e-5,
+    parser.add_argument('--eps_sigma', type=float, default=1e-4,
                         help='hard constraint on C_Sigma')
     parser.add_argument('--gamma', type=float, default=0.99,
                         help='learning rate')
@@ -59,8 +59,8 @@ def _parse():
     #                     help='flag for log messages while learning')
     _add_bool_arg(parser, 'log', default=False)
     parser.add_argument('--log_dir', type=str, default=None,
-                        help='safe log if safe log flag is set')
-    _add_bool_arg(parser, 'safe', default=True)
+                        help='save log if safe log flag is set')
+    _add_bool_arg(parser, 'save', default=True)
     _add_bool_arg(parser, 'load', default=False)
     # parser.add_argument('--safe', type=bool, default=True,
     #                     help='flag if to safe the model')
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 log=model_args['log'],
                 log_dir=model_args['log_dir'],
                 render=model_args['render'],
-                safe=model_args['safe'],
+                safe=model_args['save'],
                 safe_path=model_args['path'])
     if model_args['load']:
         model.load_model(model_args['path'])

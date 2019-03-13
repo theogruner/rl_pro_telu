@@ -68,15 +68,31 @@ class DDPG(object):
         # fill buffer with random transitions
         self._random_trajectory(self.batch_size)
         # copy parameters to target networks
-        for target_param, param in zip(self.target_actor.parameters(),
-                                       self.actor.parameters()):
-            target_param.data.copy_(param.data)
-            target_param.requires_grad = False
 
         for target_param, param in zip(self.target_critic.parameters(),
                                        self.critic.parameters()):
             target_param.data.copy_(param.data)
             target_param.requires_grad = False
+
+        # perturbed actor
+        if noise_name == 'AdaptiveParam':
+            self.perturbed_actor = Actor(self.state_shape, self.action_shape, layer1=actor_layers[0],
+                                         layer2=actor_layers[1]) \
+                if actor_layers is not None else Actor(self.state_shape, self.action_shape)
+
+            for pert_param, target_param, param in zip(self.perturbed_actor.parameters(),
+                                                       self.target_actor.parameters(),
+                                                       self.actor.parameters()):
+                pert_param.data.copy_(param.data)
+                target_param.data.copy_(param.data)
+                pert_param.requires_grad = False
+                target_param.requires_grad = False
+        else:
+            for target_param, param in zip(self.target_actor.parameters(),
+                                           self.actor.parameters()):
+                target_param.data.copy_(param.data)
+                target_param.requires_grad = False
+
         # control/log variables or flags
         self.episode = 0
         self.log = log
@@ -108,8 +124,11 @@ class DDPG(object):
                  (target policy without noise if not training)
         """
         obs = torch.tensor(observation).float()
-        a = self.actor.evex(obs).detach().numpy() + self.noise.get_noise() if train \
-            else self.actor.evex(obs).detach().numpy()
+        if self.noise_name == 'AdaptiveParam':
+            a = self.perturbed_actor.evex(obs).detach().numpy()
+        else:
+            a = self.actor.evex(obs).detach().numpy() + self.noise.get_noise() if train \
+                else self.actor.evex(obs).detach().numpy()
         a = a * self.action_range
         a = np.clip(a, a_min=-self.action_range,
                     a_max=self.action_range)
@@ -141,7 +160,8 @@ class DDPG(object):
                                        self.actor.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
 
-    def train(self, episodes=None, episode_length=None, render=None, save=None, save_path=None, log=None, log_name=None):
+    def train(self, episodes=None, episode_length=None, render=None,
+              save=None, save_path=None, log=None, log_name=None):
         """
         trains the model
         :param episodes: (int) number of episodes to make
@@ -195,8 +215,8 @@ class DDPG(object):
                     self._sample_batches(self.batch_size)
 
                 # update critic
-                with torch.no_grad():
-                    target_action = self.target_actor(next_state_batch)
+                # with torch.no_grad():
+                target_action = self.target_actor(next_state_batch)
                 y = reward_batch + self.gamma * self.target_critic(next_state_batch, target_action)
 
                 self.critic_optimizer.zero_grad()
@@ -217,12 +237,18 @@ class DDPG(object):
 
                 # update parameter
                 self._soft_update()
-
-                if self.noise_name is 'AdaptiveParam':
-                    distance = self.loss(target_action, sample_action)
+                if self.noise_name == 'AdaptiveParam':
+                    pert_action = self.perturbed_actor(state_batch)
+                    distance = self.loss(pert_action, sample_action)
                     self.noise.set_distance(distance)
-                self.noise.iteration()
-
+                    self.noise.iteration()
+                    std = self.noise.get_noise()
+                    for pert_param, param in zip(self.perturbed_actor.parameters(),
+                                                   self.actor.parameters()):
+                        pert_param.data.copy_(param.data + torch.normal(mean=torch.zeros(pert_param.shape),
+                                                                        std=std))
+                else:
+                    self.noise.iteration()
 
             # logging
             if log_f:
