@@ -7,8 +7,8 @@ from scipy.optimize import minimize
 import gym
 import quanser_robots
 
-from actor import Actor
-from critic import Critic
+from mpo.actor import Actor
+from mpo.critic import Critic
 from tensorboardX import SummaryWriter
 
 
@@ -139,6 +139,7 @@ class MPO(object):
         :param next_states: mini-batch of next-states
         :return:
         """
+        # TODO: maybe use retrace Q-algorithm
         states = torch.from_numpy(states).float()
         rewards = torch.from_numpy(rewards).float()
         actions = torch.from_numpy(actions).float()
@@ -248,7 +249,6 @@ class MPO(object):
                     additional_q = np.array(additional_q).squeeze()
 
                     # Update Q-function
-                    # TODO: maybe use retrace Q-algorithm
                     q_loss = self._critic_update(
                         states=state_batch,
                         actions=action_batch,
@@ -278,10 +278,11 @@ class MPO(object):
                     exp_Q = torch.exp(exp_Q - baseline)
                     normalization = torch.mean(exp_Q, 0)
                     action_q = additional_action * exp_Q / normalization
+                    print(additional_q)
 
                     # M-step
                     # update policy based on lagrangian
-                    for _ in range(5):
+                    for _ in range(1):
                         μ, A = self.actor.forward(torch.tensor(state_batch).float())
                         π = MultivariateNormal(μ, scale_tril=A)
 
@@ -322,7 +323,7 @@ class MPO(object):
 
             print(
                 "\n Episode:\t", episode,
-                "\n Mean reward:\t", mean_reward / it,
+                "\n Mean reward:\t", mean_reward / it / L,
                 "\n Mean Q loss:\t", mean_q_loss / 50,
                 "\n Mean Lagrange:\t", mean_lagrange / 50,
                 "\n η:\t", self.η,

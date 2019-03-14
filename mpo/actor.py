@@ -22,7 +22,7 @@ class Actor(nn.Module):
         self.cholesky_layer = nn.Linear(layer2, self.action_shape, True)
         # self.cholesky_layer = nn.Linear(LAYER_2, int((self.action_shape*self.action_shape + self.action_shape)/2),
         #                                 True)
-        self.cholesky = torch.zeros(self.action_shape,self.action_shape)
+        self.cholesky = torch.zeros(self.action_shape, self.action_shape)
 
     def forward(self, states):
         """

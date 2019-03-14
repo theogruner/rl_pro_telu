@@ -1,0 +1,31 @@
+\section{Explanation of the used Algorithms}\label{sec_algorihtms}
+The reviewed algorithms are model-free and off-policy.  
+\subsection{Deep Deterministic Policy Gradient}
+DDPG \cite{Lillicrap2015} is a policy search algorithm which optimizes the policy based on gradient descent. It is assumed that the gradient of the policy gradient and the gradient of the objective function $\mathcal{J}(\theta)$ w.r.t. the policy parameters $\theta$ are in the same direction which results in following policy update.
+\begin{equation}
+	\theta_{t+1} = \theta_{t} + \alpha \nabla_{\theta}\mathcal{J}(\theta)
+\end{equation} 
+The evaluation of $\nabla_{\theta}\mathcal{J}(\theta)$ is based on the Deterministic Policy Gradient \cite{Silver2014}.
+\begin{equation}
+	\nabla_{\theta}\mathcal{J}(\theta) = \mathbb{E}_{s\sim\mu^{\pi}(s)}\left[\nabla_{\theta}Q(s,a)|_{a=\pi(s)}\right]
+\end{equation}
+The Q-function needed for the calculation of the policy gradient is represented by a neural network. The parameterized policy is also approximated by neural networks. In order to fit the parameterized Q-function to the true one, the Q-function is improved by minimizing the TD-difference between the expected Q-function $Q(s_{t}, a_{t})$ in state $s_{t}$ and the reward $r(s_{t},a_{t}) + Q(s_{t+1},a_{t+1})$
+\begin{equation}
+	\min\limits_{\phi}L = \min\limits_{\phi} \mathbb{E}_{s\sim\mu^{\pi}(s)}\left[\left(Q^{\phi}(s_{t}, a_{t}) - r(s_{t},a_{t}) + Q^{\phi^{\prime}}(s_{t+1},a_{t+1})\right)^{2}\right]
+\end{equation}
+The expectation can be approximated by sampling random tuples of $(s_{t}, a_{t}, r(s_{t}, a_{t}), s_{t+1})$.
+In order to be off-policy, a Gaussian noise is added to the deterministic policy. As will be shown in the later sections, choosing an appropriate noise is key for the performance of the algorithm.
+\paragraph{Useful Hyperparameter Tuning:}
+DDPG lacks the stability of robust Trust-Region algorithms and is heavily dependent on the hyperparameter settings. We focused primarily on the usage of different noises and on the batch size. The default noise used in the original paper was an Ornstein-Uhlenback (OU) noise, but recent advances favor the Adaptive-Parameter noise \cite{Plappert2017}. The first adds noise to the action while the latter adds noise to the parameters of a perturbed actor.\\
+Another important hyperparameter tends to be the mini-batch size. In order to estimate the mean the batch-size should grow for more complex environments.
+
+\subsection{Maximum A Posteriori Policy Optimization}
+Big disadvantages of off-policy algorithms, like DDPG, are that convergence is not guaranteed, especially for high dimensional problems. This is due to an information loss \cite{Peters2008a} occurring when the difference between the old and updated policy is too large. On-policy algorithms, like REPS or PPO, cope with this problem by introducing an additional Kullback-Leibler constraint which regularizes the policy update w.r.t the old policy. On-policy algorithms tend to converge more consistently than off-policy algorithm but are instead data inefficient since the sampled data can only be used once.\\
+MPO \cite{Abdolmaleki2018a} uses the KL constraint but is still and off-policy algorithm which leads to an algorithm which is supposed to converge fast with high data efficiency.
+The optimization is split into three distinct steps. First, the Q-function is updated, then the dual function of the constraint optimization problem is solved which is similar to REPS and in the third step the policy is updated. Except for the hyperparameters, the evaluation of the Q-function seemed to be to be crucial.\\
+Concerning MPO, one can choose between a parametric or non-parametric additional q-function which perform differently. Both ways have been implemented in the context of this work.
+\begin{itemize}
+	\item Briefly explain background of algorithm
+	\item Difficulties in implementation
+	\item 
+\end{itemize}

@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 log_dir=model_args['log_dir'],
                 render=model_args['render'],
                 save=model_args['save'],
-                save_path=model_args['path'])
+                save_path=model_args['save_path'])
     if model_args['load'] is not None:
         model.load_model(model_args['load'])
     if model_args['train']:
