@@ -18,6 +18,7 @@ class DDPG(object):
 
     :param env: (Gym Environment) gym environment to learn from
     :param noise: (Noise) the noise to learn with
+    :param noise_name: (str) id of the noise
     :param buffer_capacity: (int) capacity of the replay buffer
     :param batch_size: (int) size of the sample batches
     :param gamma: (float) discount factor
@@ -27,58 +28,73 @@ class DDPG(object):
     :param episode_length: (int) length of an episode (= training steps per episode)
     :param actor_layers: (int, int) size of the layers of the policy network
     :param critic_layers: (int, int) size of the layers of the critic network
+    :param norm: (bool) flag for using normalization in networks
     :param log: (bool) flag for logging
+    :param log_name: (str) name of the log file
     :param render: (bool) flag if to render while training or not
     :param save: (bool) flag if to save the model if finished
     :param save_path: (str) path for saving and loading a model
 
     """
     def __init__(self, env, noise=None, noise_name=None, buffer_capacity=int(1e6), batch_size=64,
-                 gamma=0.99, tau=0.001, episodes=int(1e4), learning_rate=1e-3,
-                 episode_length=3000, actor_layers=None, critic_layers=None,
+                 gamma=0.99, tau=0.001, learning_rate=1e-3,
+                 episodes=int(1e4), episode_length=3000,
+                 actor_layers=None, critic_layers=None, norm = True,
                  log=True, log_name=None, render=True, save=True, save_path="ddpg_model.pt"):
+
         # initialize env and read out shapes
         self.env = env
         self.state_shape = self.env.observation_space.shape[0]
         self.action_shape = self.env.action_space.shape[0]
         self.action_range = env.action_space.high[0] if self.action_shape == 1\
             else env.action_space.high
+
         # initialize noise/buffer/loss
         self.noise = noise if noise is not None else OrnsteinUhlenbeck(self.action_shape)
         self.noise_name = noise_name if noise_name is not None else 'OUnoise'
         self.buffer = ReplayBuffer(buffer_capacity)
         self.loss = nn.MSELoss()
+
         # initialize hyperparameters
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
         self.episodes = episodes
         self.episode_length = episode_length
+
         # initialize networks and optimizer
-        self.actor = Actor(self.state_shape, self.action_shape, layer1=actor_layers[0], layer2=actor_layers[1]) \
-            if actor_layers is not None else Actor(self.state_shape, self.action_shape)
-        self.target_actor = Actor(self.state_shape, self.action_shape, layer1=actor_layers[0], layer2=actor_layers[1]) \
-            if actor_layers is not None else Actor(self.state_shape, self.action_shape)
-        self.critic = Critic(self.state_shape, self.action_shape, layer1=critic_layers[0], layer2=critic_layers[1]) \
-            if actor_layers is not None else Critic(self.state_shape, self.action_shape)
-        self.target_critic = Critic(self.state_shape, self.action_shape, layer1=critic_layers[0], layer2=critic_layers[1]) \
-            if actor_layers is not None else Critic(self.state_shape, self.action_shape)
+        self.actor = Actor(self.state_shape, self.action_shape,
+                           layer1=actor_layers[0], layer2=actor_layers[1],
+                           norm=norm) if actor_layers is not None \
+            else Actor(self.state_shape, self.action_shape, norm=norm)
+        self.target_actor = Actor(self.state_shape, self.action_shape,
+                                  layer1=actor_layers[0], layer2=actor_layers[1],
+                                  norm=norm) if actor_layers is not None \
+            else Actor(self.state_shape, self.action_shape, norm=norm)
+        self.critic = Critic(self.state_shape, self.action_shape,
+                             layer1=critic_layers[0], layer2=critic_layers[1],
+                             norm=norm) if actor_layers is not None\
+            else Critic(self.state_shape, self.action_shape, norm=norm)
+        self.target_critic = Critic(self.state_shape, self.action_shape,
+                             layer1=critic_layers[0], layer2=critic_layers[1],
+                             norm=norm) if actor_layers is not None \
+            else Critic(self.state_shape, self.action_shape, norm=norm)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=learning_rate)
+
         # fill buffer with random transitions
         self._random_trajectory(self.batch_size)
-        # copy parameters to target networks
 
+        # copy parameters to target networks
         for target_param, param in zip(self.target_critic.parameters(),
                                        self.critic.parameters()):
             target_param.data.copy_(param.data)
             target_param.requires_grad = False
-
-        # perturbed actor for ParameterNoise
-        if noise_name == 'AdaptiveParam':
-            self.perturbed_actor = Actor(self.state_shape, self.action_shape, layer1=actor_layers[0],
-                                         layer2=actor_layers[1]) \
-                if actor_layers is not None else Actor(self.state_shape, self.action_shape)
+        if noise_name == 'AdaptiveParam':  # perturbed actor for ParameterNoise
+            self.perturbed_actor = Actor(self.state_shape, self.action_shape,
+                                         layer1=actor_layers[0], layer2=actor_layers[1],
+                                         norm=norm) if actor_layers is not None \
+                else Actor(self.state_shape, self.action_shape, norm=norm)
 
             for pert_param, target_param, param in zip(self.perturbed_actor.parameters(),
                                                        self.target_actor.parameters(),
@@ -117,9 +133,10 @@ class DDPG(object):
 
     def _select_action(self, observation, train=True):
         """
-        selects a action based on the policy(/target policy) and a given state
+        selects a action based on the policy(/target policy) and a given state for
+        exploration and evaluation
         :param observation: (State) the state the decision is based on
-        :param noise: (bool) a flag determining wether to add noise to the action or not
+        :param train: (bool) a flag determining wether to add noise to the action or not
         :return: (Action) the action taken following the policy plus noise
                  (target policy without noise if not training)
         """
@@ -149,7 +166,7 @@ class DDPG(object):
         """
         sample = self.buffer.sample(size)
         state_batch, action_batch, reward_batch, next_state_batch = \
-            self.buffer.batches_from_sample(sample, self.batch_size)
+            self.buffer.batches_from_sample(sample, size)
         state_batch, action_batch, reward_batch, next_state_batch = \
             torch.tensor(state_batch).float(), torch.tensor(action_batch).float(),\
             torch.tensor(reward_batch).float(), torch.tensor(next_state_batch).float()
@@ -177,7 +194,9 @@ class DDPG(object):
         :param save: (bool) flag if to save the model after training
         :param save_path: (str) path where to save the model
         :param log: (bool) flag for logging messages and recording
+        :param log_name: (str) name of log file
         """
+        # initialize flags and params
         rend = render if render is not None else self.render
         sf = save if save is not None else self.save
         sv_path = save_path if save_path is not None else self.save_path
@@ -191,9 +210,10 @@ class DDPG(object):
             writer = SummaryWriter("runs/" + log_n) if log_n is not None \
                 else SummaryWriter()
 
-        for episode in range(0, ep):
-            if self.episode != 0:
-                episode = self.episode
+        # start training
+        for episode in range(self.episode, ep):
+
+            # reset noise/env/logging variables
             self.noise.reset()  # TODO: maybe not for Adaptive Param noise??
             observation = self.env.reset()
             if log_f:
@@ -201,17 +221,22 @@ class DDPG(object):
                 q_per_ep = 0
                 qloss_per_ep = 0
 
+            # start episode
             for t in range(1, it + 1):
-                # choose action and execute it
+
+                # exploration
                 action = self._select_action(observation)
                 new_observation, reward, done, _ = self.env.step(action)
                 if rend is True:
                     self.env.render()
+
                 # logging
                 if log_f:
                     reward_per_episode += reward
-                    q_per_ep += self.critic.log(torch.tensor(observation).float(),
-                                                torch.tensor(action).float()).detach().item()
+                    self.critic.eval()
+                    q_per_ep += self.critic(torch.tensor([observation]).float(),
+                                            torch.tensor([action]).float())[0].detach().item()
+                    self.critic.train()
 
                 # push transition onto the buffer
                 self.buffer.push(observation, action, reward, new_observation)
@@ -244,7 +269,7 @@ class DDPG(object):
                 # update target_networks
                 self._soft_update()
 
-                # update noisy actor parameters
+                # update noise
                 if self.noise_name == 'AdaptiveParam':
                     pert_action = self.perturbed_actor(state_batch)
                     distance = self.loss(pert_action, sample_action)
@@ -257,6 +282,9 @@ class DDPG(object):
                                                                         std=std))
                 else:
                     self.noise.iteration()
+
+                if done:
+                    observation = self.env.reset()
 
             # logging
             if log_f:
@@ -277,11 +305,13 @@ class DDPG(object):
                 writer.add_scalar('target/rew_per_ep', reward_target,
                                   episode+1)
 
+            # end of episode
             self.episode += 1
             if sf:
                 self.save_model(sv_path)
-            print("episode " + str(episode+1) + " of " + str(ep))
+            print("Episode " + str(episode+1) + " of " + str(ep) + " finished!")
 
+        # finish training
         if log_f:
             writer.close()
         if sf is True:
@@ -317,7 +347,7 @@ class DDPG(object):
                     self.env.render()
                 # reward_e.append(rew.item())
                 # mean_reward_e.append(np.mean(reward_e).item())
-                observation = new_observation
+                observation = new_observation if not done else  self.env.reset()
             # reward.append(reward_e)
             # mean_reward.append(mean_reward_e)
             # mean_q.append(mean_q_e)

@@ -7,14 +7,13 @@ class Noise(object):
     """
     def iteration(self):
         """
-        generate noise
-        :return: noise (at current time step)
+        update the noise
         """
         pass
 
     def reset(self):
         """
-        resets the noise, hence called before episode
+        resets the noise, hence called at the start of an episode
         """
         pass
 
@@ -42,12 +41,14 @@ class OrnsteinUhlenbeck(Noise):
     def iteration(self):
         """
         make a time-step in the Ornstein Uhlenbeck process
-        :return: the current noise value
         """
         self.x = self.x + self.theta*(self.mu - self.x)*self.delta_t \
             + self.sigma * self._wiener_process()
 
     def get_noise(self):
+        """
+        :return: the current noise value
+        """
         return self.x
 
     def reset(self):
@@ -67,6 +68,10 @@ class OrnsteinUhlenbeck(Noise):
 class AdaptiveParameter(Noise):
     """
     Adaptive Parameter noise
+    :param initial_std:
+    :param threshold:
+    :param scaling_factor:
+    :param init_distance: (float) initial distance of the policies
     """
     def __init__(self, initial_std=0.1, threshold=0.1,
                  scaling_factor=1.01, init_distance=0):
@@ -77,16 +82,28 @@ class AdaptiveParameter(Noise):
         self.distance = init_distance
 
     def set_distance(self, distance):
+        """
+        :param distance: (float) policy distance
+        """
         self.distance = distance
 
     def iteration(self):
+        """
+        update noise
+        """
         if self.distance <= self.threshold:
             self.std *= self.alpha
         else:
             self.std /= self.alpha
 
     def get_noise(self):
+        """
+        :return: returns current noise
+        """
         return self.std
 
     def reset(self):
+        """
+        sets the noise to the initial state
+        """
         self.std = self.initial_std
