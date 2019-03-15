@@ -67,7 +67,7 @@ def _parse():
     _add_bool_arg(parser, 'eval', default=False)
     parser.add_argument('--eval_episodes', type=int, default=100,
                         help='number of episodes for evaluation')
-    parser.add_argument('--eval_ep_length', type=int, default=500,
+    parser.add_argument('--eval_ep_length', type=int, default=3000,
                         help='length of an evaluation episode')
     _add_bool_arg(parser, 'eval_render', default=True)
 

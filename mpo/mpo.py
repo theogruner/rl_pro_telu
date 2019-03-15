@@ -37,7 +37,7 @@ class MPO(object):
     :param save_path: (str) path for saving and loading a model
     """
     def __init__(self, env, dual_constraint=0.1, mean_constraint=0.1, var_constraint=1e-4,
-                 learning_rate=0.99, alpha=1e4, episodes=int(200), episode_length=3000,
+                 learning_rate=0.99, alpha=10, episodes=int(200), episode_length=3000,
                  lagrange_it=5, mb_size=64, rerun_mb=5, sample_episodes=1, add_act=64,
                  actor_layers=None, critic_layers=None,
                  log=True, log_dir=None, render=False, save=True, save_path="mpo_model.pt"):

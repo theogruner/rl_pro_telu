@@ -64,7 +64,7 @@ def _parse():
                         help='hard constraint on C_Sigma')
     parser.add_argument('--gamma', type=float, default=0.99,
                         help='learning rate')
-    parser.add_argument('--alpha', type=float, default=1e4,
+    parser.add_argument('--alpha', type=float, default=10,
                         help='scaling factor of the '
                              'lagrangian multiplier in the M-step')
     parser.add_argument('--mb_size', type=int, default=64,
@@ -82,7 +82,7 @@ def _parse():
     _add_bool_arg(parser, 'eval', default=False)
     parser.add_argument('--eval_episodes', type=int, default=100,
                         help='number of episodes for evaluation')
-    parser.add_argument('--eval_ep_length', type=int, default=10000,
+    parser.add_argument('--eval_ep_length', type=int, default=3000,
                         help='length of an evaluation episode')
     # parser.add_argument('--log', type=bool, default=True,
     #                     help='flag for log messages while learning')
