@@ -72,7 +72,7 @@ The algorithms are intended for continuous gym environments !
    
    * Make sure the script is the same directory as the _ddpg_ package (has acces to the required package).
    * The noise should extend the _Noise_ class in _noise.py_ (contain a _reset_ and _iteration_ function) 
-   * Following examples basicly covers previous examples functionality
+   * Following examples cover previous examples functionality
    
         ```python
         import gym    
