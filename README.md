@@ -71,7 +71,12 @@ The algorithms are intended for continuous gym environments !
         # setup a DDPG model w.r.t. the environment and self defined noise
         model = DDPG(env, noise, save_path="furuta_model.pt")
         model.train()
-        mean_reward = model.eval(episodes=100, episode_length=500)     
+        mean_reward = model.eval(episodes=100, episode_length=500)
+        
+        print(mean_reward)
+        
+        # always close the environment when finished 
+        env.cose()
         ``` 
  * **Setting Hyperparameters**
  
@@ -94,6 +99,7 @@ The algorithms are intended for continuous gym environments !
        act = ctrl(obs)
        obs, rwd, done, info = env.step(act)
     
+    # always close the environment when finished
     env.close()
     ```
 ### MPO
