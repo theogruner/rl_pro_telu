@@ -24,12 +24,13 @@ The algorithms are intended for continuous gym environments !
     If you want to use DDPG with our pre-implemented noises
     you can simply do this via the _main_ddpg.py_ file.
         
-    * Training on the Qube-v0 environment with default hyperparameters and 
-    saving the model as _'furuta_model.pt'_ (saves by default as _ddpg_model.pt_).
-    Saving can be disabled with _--no-save_
+    * Training on the Qube-v0 environment with default hyperparameters and Ornstein-Uhlenbeck noise, 
+    saving the model as _furuta_model.pt_ and the log in _furuta_model_
+    (saves by default as _ddpg_model.pt_, and log in a automatic generated directory).
+    Saving/logging could be disabled with _--no-save_ and _--no-log_
         
         ```bash
-        python3 path/to/main_ddpg.py --env Qube-v0 --save_path furuta_model.pt
+        python3 path/to/main_ddpg.py --env Qube-v0 --save_path furuta_model.pt --log_name furuta_log
         ```
     
     * Loading a saved model and evaluating it in the Qube-v0 environment.
@@ -40,7 +41,7 @@ The algorithms are intended for continuous gym environments !
         python3 path/to/main_ddpg.py --env Qube-v0 --no-train --eval --load furuta_model.pt
         ```
 
-    * For more information, about adaptable hyperparameters, use:
+    * For more information, e.g. about adaptable hyperparameters, use:
     
         ```bash
         python3 path/to/main_ddpg.py --help
@@ -53,7 +54,7 @@ The algorithms are intended for continuous gym environments !
    * Make sure the script is the same directory as the _ddpg_ package.
    * The noise should extend the _Noise_ class in _noise.py_ (contain a _reset_ and _iteration_ function) 
    * Following example basicly does the same as the combination of the previous examples 
-   (except that no model has to be loaded in, to load a model use _model.load_model('PATH')_) 
+   (except that no model is loaded in, to load a model use _model.load_model('PATH')_) 
    
         ```python
         import gym    
@@ -70,7 +71,7 @@ The algorithms are intended for continuous gym environments !
         # setup a DDPG model w.r.t. the environment and self defined noise
         model = DDPG(env, noise, save_path="furuta_model.pt")
         model.train()
-        model.eval(episodes=100, episode_length=500)     
+        mean_reward = model.eval(episodes=100, episode_length=500)     
         ``` 
  * **Setting Hyperparameters**
  
@@ -79,6 +80,22 @@ The algorithms are intended for continuous gym environments !
    ```python
    model = DDPG(env, noise, gamma=0.5, tau=0.1, learning_rate=1e-2)
    ```
+ * **Using a model as a controller**
+    
+    If you want to use your a model as a simple controller just call the model
+    passing an observation:
+    
+    ```python
+    ctrl = DDPG(env, noise)
+    ctrl.load('furuta_model.pt')
+
+    while not done:
+       env.render()
+       act = ctrl(obs)
+       obs, rwd, done, info = env.step(act)
+    
+    env.close()
+    ```
 ### MPO
 ### Logging
 By default logging is enabled and safes the logs in the _runs/_ directory.

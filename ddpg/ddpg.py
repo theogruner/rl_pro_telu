@@ -117,6 +117,9 @@ class DDPG(object):
         self.save = save
         self.save_path = save_path
 
+    def __call__(self, obs):
+        return self._select_action(obs, train=False)
+
     def _random_trajectory(self, length):
         """
         pushes a given number of random transitions on the buffer
