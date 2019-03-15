@@ -218,7 +218,7 @@ class MPO(object):
         is_log = log if log is not None else self.log
         log_d = log_dir if log_dir is not None else self.log_dir
         if is_log:
-            writer = SummaryWriter() if log_d is None else SummaryWriter(log_d)
+            writer = SummaryWriter() if log_d is None else SummaryWriter("runs/" + log_d)
 
         # start training
         for episode in range(self.episode, ep):

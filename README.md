@@ -24,7 +24,7 @@ The algorithms are intended for continuous gym environments !
     If you want to use DDPG with our pre-implemented noises
     you can simply do this via the _main_ddpg.py_ file.
         
-    * Training on the Qube-v0 environment with default hyperparameters and Ornstein-Uhlenbeck noise, 
+    * Training on the Qube-v0 (can be replaced with any environment id e.g. Levitation-v0) environment with default hyperparameters and Ornstein-Uhlenbeck noise, 
     saving the model as _furuta_model.pt_ and the log in _furuta_model_
     (saves by default as _ddpg_model.pt_, and log in a automatic generated directory).
     Saving/logging could be disabled with _--no-save_ and _--no-log_
@@ -40,6 +40,25 @@ The algorithms are intended for continuous gym environments !
         ```bash
         python3 path/to/main_ddpg.py --env Qube-v0 --no-train --eval --load furuta_model.pt
         ```
+        
+    * Training and evaluating are executed sequentially, so if u want to evaluate a just 
+    trained model, this will work:
+    
+        ```bash
+        python3 path/to/main_ddpg.py --env Qube-v0 --train -eval --save_path furuta_model.pt --log_name furuta_log 
+        ```
+        
+    * Loading a model and setting the train flag will continue training on the loaded model
+    
+        ```bash
+        python3 path/to/main_ddpg.py --env Qube-v0 --train -eval --save_path furuta_model.pt --log_name furuta_log --load furuta_model.pt
+        ```
+        
+    * Adapting hyperparameters is quite intuitive:
+    
+        ````bash
+        python3 path/to/main_ddpg.py --env Qube-v0 --gamma 0.5 --tau 0.1 --batch_size 1024
+        ````
 
     * For more information, e.g. about adaptable hyperparameters, use:
     
@@ -49,12 +68,11 @@ The algorithms are intended for continuous gym environments !
     
  * **Usage with self defined noise**
  
-   To use a self defined noise you need to write a script by yourself.
+   To use a self defined noise you will need to write a script by yourself.
    
-   * Make sure the script is the same directory as the _ddpg_ package.
+   * Make sure the script is the same directory as the _ddpg_ package (has acces to the required package).
    * The noise should extend the _Noise_ class in _noise.py_ (contain a _reset_ and _iteration_ function) 
-   * Following example basicly does the same as the combination of the previous examples 
-   (except that no model is loaded in, to load a model use _model.load_model('PATH')_) 
+   * Following examples basicly covers previous examples functionality
    
         ```python
         import gym    
@@ -69,22 +87,24 @@ The algorithms are intended for continuous gym environments !
         noise = OrnsteinUhlenbeck(action_shape)
         
         # setup a DDPG model w.r.t. the environment and self defined noise
-        model = DDPG(env, noise, save_path="furuta_model.pt")
+        model = DDPG(env, noise, save_path="furuta_model.pt", log_name="furuta_log")
+    
+        # load a model
+        model.load_model("furuta_model.pt")
+        #trains the model
         model.train()
+        #evaluates the model and returns a meaned reward over all episodes
         mean_reward = model.eval(episodes=100, episode_length=500)
-        
         print(mean_reward)
         
         # always close the environment when finished 
         env.cose()
         ``` 
- * **Setting Hyperparameters**
+    * Setting Hyperparameters would look something like this:
  
-    Setting hyperparameters would look something like this:
-    
-   ```python
-   model = DDPG(env, noise, gamma=0.5, tau=0.1, learning_rate=1e-2)
-   ```
+       ```python
+       model = DDPG(env, noise, gamma=0.5, tau=0.1, learning_rate=1e-2)
+       ```
  * **Using a model as a controller**
     
     If you want to use your a model as a simple controller just call the model
@@ -103,6 +123,24 @@ The algorithms are intended for continuous gym environments !
     env.close()
     ```
 ### MPO
+
+Using MPO is analogous to ddpg
+
+* Use _main_mpo.py_ instead of _main_ddpg.py_
+* For information on the parameters you can set: _python3 main_mpo.py --help_
+* Due to no noise needed writing an own script is not necessary but for completeness 
+a little code snippet as example:
+
+    ```python
+    import gym
+    import quanser_robots
+    from mpo import MPO
+
+    env = gym.make('Qube-v0')
+    model = MPO(env, save_path="furuta_model.pt", log_name="furuta_log")
+    # continues like DDPG example ...
+    ```
+
 ### Logging
 By default logging is enabled and safes the logs in the _runs/_ directory.
 Name of the logs can be set by the *log_name* parameter (*--log_name* argument).
