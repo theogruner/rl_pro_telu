@@ -145,7 +145,7 @@ class MPO(object):
         rewards = torch.from_numpy(rewards).float()
         y = rewards + self.γ * mean_next_q
         self.critic_optimizer.zero_grad()
-        target = self.critic(states, actions)
+        target = self.critic(torch.from_numpy(states).float(), torch.from_numpy(actions).float())
         loss_critic = self.mse_loss(y, target)
         loss_critic.backward()
         self.critic_optimizer.step()
