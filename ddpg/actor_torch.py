@@ -37,26 +37,3 @@ class Actor(nn.Module):
         x = F.relu(x)
         x = torch.tanh(self.lin3(x))
         return x
-
-    #def evex(self, state):
-    #    """
-    #    Forward function for evaluation and exploration
-    #    :param state: (State) a state of the environment
-    #    :return: (float) output of the network(= action chosen by policy at
-    #              given state)
-    #    """
-    #    s = F.batch_norm(torch.tensor([state.numpy()]),
-    #                     self.state_norm.running_mean,
-    #                     self.state_norm.running_var)
-    #    x = F.batch_norm(self.lin1(s),
-    #                     self.norm1.running_mean,
-    #                     self.norm1.running_var)
-    #    #x = self.lin1(state)
-    #    x = F.relu(x)
-    #    x = F.batch_norm(self.lin2(x),
-    #                     self.norm2.running_mean,
-    #                     self.norm2.running_var)
-    #    #x = self.lin2(x)
-    #    x = F.relu(x)
-    #    x = torch.tanh(self.lin3(x))
-    #    return x[0]

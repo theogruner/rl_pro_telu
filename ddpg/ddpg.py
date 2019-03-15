@@ -117,6 +117,9 @@ class DDPG(object):
         self.save = save
         self.save_path = save_path
 
+    def __call__(self, obs):
+        return self._select_action(obs, train=False)
+
     def _random_trajectory(self, length):
         """
         pushes a given number of random transitions on the buffer
@@ -296,13 +299,8 @@ class DDPG(object):
                                   episode+1)
                 writer.add_scalar('data/mean_qloss_per_ep', qloss_per_ep / it,
                                   episode+1)
-                reward_target = 0
-                state = self.env.reset()
-                for log_i in range(0, it):
-                    act = self._select_action(state, train=False)
-                    next_s, rew, _, _ = self.env.step(act)
-                    reward_target += rew
-                writer.add_scalar('target/rew_per_ep', reward_target,
+                reward_target = self.eval(10, self.episode_length, render=False)
+                writer.add_scalar('target/mean_rew_10_ep', reward_target,
                                   episode+1)
 
             # end of episode
@@ -317,43 +315,30 @@ class DDPG(object):
         if sf is True:
             self.save_model(sv_path)
 
-
-    # TODO eval
     def eval(self, episodes, episode_length, render=True):
         """
-        method for evaluating current model
+        method for evaluating current model (mean reward for a given number of
+        episodes and episode length)
         :param episodes: (int) number of episodes for the evaluation
-        :param episode_length: (int) length of a single episode (0 -> until done)
+        :param episode_length: (int) length of a single episode
         :param render: (bool) flag if to render while evaluating
-        :return: ([[float]],[float],[float]) tuple of arrays, size is number of episodes and one entry corresponds to one episode,
-                 with Format (rewards, mean reward w.r.t. all previous rewards, mean q-value w.r.t. all previous episodes)
+        :return: (float) meaned reward achieved in the episodes
         """
-        # self.actor.eval()
-        # reward = 0
-        # mean_reward = []
-        # mean_q = []
+
+        summed_rewards = 0
         for episode in range(episodes):
+            reward = 0
             observation = self.env.reset()
-            # reward_e = []
-            # mean_reward_e = []
-            # mean_q_e = []
             for step in range(episode_length):
                 action = self._select_action(observation, train=False)
-                # obs = torch.tensor(observation).float()
-                # q = self.critic.eval(state, action).item()
-                # mean_q_e.append(q)
                 new_observation, rew, done, _ = self.env.step(action)
+                reward += rew
                 if render:
                     self.env.render()
-                # reward_e.append(rew.item())
-                # mean_reward_e.append(np.mean(reward_e).item())
-                observation = new_observation if not done else  self.env.reset()
-            # reward.append(reward_e)
-            # mean_reward.append(mean_reward_e)
-            # mean_q.append(mean_q_e)
+                observation = new_observation if not done else self.env.reset()
 
-        # self.actor.train()
-        # return reward, mean_reward, mean_q
+            summed_rewards += reward
+        return summed_rewards/episodes
 
     def save_model(self, path=None):
         """
