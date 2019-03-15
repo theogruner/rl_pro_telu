@@ -130,7 +130,7 @@ class MPO(object):
         next_states = np.array(next_states)
         return states, actions, rewards, next_states, mean_reward
 
-    def _critic_update(self, states, actions, rewards, next_states):
+    def _critic_update(self, rewards, mean_q, mean_next_q):
         """
         Updates the critics
         :param states: mini-batch of states
@@ -140,14 +140,10 @@ class MPO(object):
         :return:
         """
         # TODO: maybe use retrace Q-algorithm
-        states = torch.from_numpy(states).float()
         rewards = torch.from_numpy(rewards).float()
-        actions = torch.from_numpy(actions).float()
-        next_states = torch.from_numpy(next_states).float()
-        y = rewards + self.γ * self.target_critic(next_states, self.target_actor.action(next_states))
+        y = rewards + self.γ * mean_next_q
         self.critic_optimizer.zero_grad()
-        target = self.critic(states, actions)
-        loss_critic = self.mse_loss(y, target)
+        loss_critic = self.mse_loss(y, mean_q)
         loss_critic.backward()
         self.critic_optimizer.step()
         return loss_critic.item()
@@ -238,22 +234,32 @@ class MPO(object):
                     target_A.detach()
                     action_distribution = MultivariateNormal(target_μ, scale_tril=target_A)
                     additional_action = []
+                    additional_target_q = []
+                    additional_next_q = []
                     additional_q = []
                     for i in range(self.M):
                         action = action_distribution.sample()
                         additional_action.append(action)
-                        additional_q.append(self.target_critic.forward(torch.tensor(state_batch).float(),
-                                                                       action).detach().numpy())
+                        additional_target_q.append(self.target_critic.forward(torch.tensor(state_batch).float(),
+                                                                              action).detach().numpy())
+                        additional_next_q.append(self.target_critic.forward(torch.tensor(next_state_batch).float(),
+                                                                            action).detach())
+                        additional_q.append(self.critic.forward(torch.tensor(state_batch).float(),
+                                                                action))
                     # print(additional_action)
                     additional_action = torch.stack(additional_action).squeeze()
-                    additional_q = np.array(additional_q).squeeze()
+                    additional_q = torch.stack(additional_q).squeeze()
+                    additional_target_q = np.array(additional_target_q).squeeze()
+                    additional_next_q = torch.stack(additional_next_q).squeeze()
+
+                    mean_q = torch.mean(additional_q, 0)
+                    mean_next_q = torch.mean(additional_next_q, 0)
 
                     # Update Q-function
                     q_loss = self._critic_update(
-                        states=state_batch,
-                        actions=action_batch,
                         rewards=reward_batch,
-                        next_states=next_state_batch
+                        mean_q=mean_q,
+                        mean_next_q=mean_next_q
                     )
                     mean_q_loss += q_loss   # TODO: can be removed
 
@@ -264,21 +270,23 @@ class MPO(object):
                         Dual function of the non-parametric variational
                         g(η) = η*ε + η \sum \log (\sum \exp(Q(a, s)/η))
                         """
-                        max_q = np.max(additional_q, 0)
+                        max_q = np.max(additional_target_q, 0)
                         return η * self.ε + np.mean(max_q) \
-                            + η * np.mean(np.log(np.mean(np.exp((additional_q - max_q) / η), 0)))
+                            + η * np.mean(np.log(np.mean(np.exp((additional_target_q - max_q) / η), 0)))
 
                     bounds = [(1e-6, None)]
                     res = minimize(dual, np.array([self.η]), method='SLSQP', bounds=bounds)
                     self.η = res.x[0]
 
                     # calculate the new q values
-                    exp_Q = torch.tensor(additional_q) / self.η
+                    exp_Q = torch.tensor(additional_target_q) / self.η
                     baseline = torch.max(exp_Q, 0)[0]
                     exp_Q = torch.exp(exp_Q - baseline)
-                    normalization = torch.mean(exp_Q, 0)
+                    normalization = torch.sum(exp_Q, 0)
                     action_q = additional_action * exp_Q / normalization
-                    print(additional_q)
+                    action_q = np.clip(action_q, a_min=-self.action_range,
+                                a_max=self.action_range)
+                    # print(action_q)
 
                     # M-step
                     # update policy based on lagrangian
