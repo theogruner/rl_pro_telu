@@ -45,7 +45,7 @@ def _parse():
                         help='saving path if save flag is set True')
     parser.add_argument('--episodes', type=int, default=int(1e4),
                         help='number of episodes to learn')
-    parser.add_argument('--episode_length', type=int, default=300,
+    parser.add_argument('--episode_length', type=int, default=3000,
                         help='length of an episodes (number of training steps)')
     # train params - hyperparameters
     parser.add_argument('--buffer_capacity', type=int, default=int(1e6),
