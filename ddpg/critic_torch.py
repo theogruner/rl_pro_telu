@@ -36,23 +36,3 @@ class Critic(nn.Module):
         x = F.relu(self.lin2(torch.cat((x, action), 1)))
         x = self.lin3(x)
         return x
-
-    #def log(self, state, action):
-    #    """
-    #    Forward function for logging
-    #    :param state: (State) a state of the environment
-    #    :param action: (Action) an action of the action-space
-    #    :return: (float) output of the network(= Q-value for the given
-    #              state-action pair)
-    #    """
-    #    s = F.batch_norm(torch.tensor([state.numpy()]),
-    #                     self.state_norm.running_mean,
-    #                     self.state_norm.running_var)
-    #    x = F.batch_norm(self.lin1(s),
-    #                     self.norm1.running_mean,
-    #                     self.norm1.running_var)
-    #    #x = self.lin1(state)
-    #    x = F.relu(x)
-    #    x = F.relu(self.lin2(torch.cat((x.squeeze(), action), 0)))
-    #    x = self.lin3(x)
-    #    return x[0]
