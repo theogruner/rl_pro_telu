@@ -27,15 +27,27 @@ def _parse():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      description='Train a ddpg model with an Ornstein Uhlenbeck noise')
 
+    # general params
     parser.add_argument('--env', type=str, default='Levitation-v0',
                         help='a gym environment ID')
+    parser.add_argument('--load', type=str, default=None,
+                        help='loading path if given')
+
+    # train params - general (true by default)
     _add_bool_arg(parser, 'train', default=True)
-    _add_bool_arg(parser, 'eval', default=False)
-    parser.add_argument('--eval_episodes', type=int, default=100,
-                        help='number of episodes for evaluation')
-    parser.add_argument('--eval_ep_length', type=int, default=500,
-                        help='length of an evaluation episode')
-    _add_bool_arg(parser, 'eval_render', default=True)
+    _add_bool_arg(parser, 'norm', default=True)
+    _add_bool_arg(parser, 'render', default=True)
+    _add_bool_arg(parser, 'log', default=True)
+    parser.add_argument('--log_name', type=str, default=None,
+                        help='name of the log file')
+    _add_bool_arg(parser, 'save', default=True)
+    parser.add_argument('--save_path', type=str, default='ddpg_model.pt',
+                        help='saving path if save flag is set True')
+    parser.add_argument('--episodes', type=int, default=int(1e4),
+                        help='number of episodes to learn')
+    parser.add_argument('--episode_length', type=int, default=300,
+                        help='length of an episodes (number of training steps)')
+    # train params - hyperparameters
     parser.add_argument('--buffer_capacity', type=int, default=int(1e6),
                         help='capacity of the buffer')
     parser.add_argument('--batch_size', type=int, default=64,
@@ -44,27 +56,24 @@ def _parse():
                         help='discount factor')
     parser.add_argument('--tau', type=float, default=0.001,
                         help='soft update coefficient')
-    parser.add_argument('--episodes', type=int, default=int(1e4),
-                        help='number of episodes to learn')
-    parser.add_argument('--episode_length', type=int, default=300,
-                        help='length of an episodes (number of training steps)')
     parser.add_argument('--learning_rate', type=float, default=1e-3,
                         help='learning rate for the opimization step')
     parser.add_argument('--actor_layers', type=tuple, default=(400, 300),
                         help='size of the policy network layers')
     parser.add_argument('--critic_layers', type=tuple, default=(400, 300),
                         help='size of the critic network layers')
-    _add_bool_arg(parser, 'norm', default=True)
-    _add_bool_arg(parser, 'log', default=True)
-    parser.add_argument('--log_name', type=str, default=None,
-                        help='name of the log file')
-    _add_bool_arg(parser, 'render', default=True)
-    _add_bool_arg(parser, 'save', default=True)
-    parser.add_argument('--load', type=str, default=None,
-                        help='loading path if given')
-    parser.add_argument('--save_path', type=str, default='ddpg_model.pt',
-                        help='saving path if save flag is set True')
+
+    # eval params (is false at default)
+    _add_bool_arg(parser, 'eval', default=False)
+    parser.add_argument('--eval_episodes', type=int, default=100,
+                        help='number of episodes for evaluation')
+    parser.add_argument('--eval_ep_length', type=int, default=500,
+                        help='length of an evaluation episode')
+    _add_bool_arg(parser, 'eval_render', default=True)
+
+    # noise params
     parser.add_argument('--noise', type=str, default='OUnoise',
+                        choices=['OUnoise', 'AdaptiveParam'],
                         help='noise type, (OUnoise, AdaptiveParam)')
     parser.add_argument('---theta_noise', type=float, default=0.15,
                         help='mean reversion rate of the noise (Ornstein Uhlenbeck)')
@@ -114,7 +123,12 @@ if __name__ == '__main__':
     if model_args['train']:
         model.train()
     if model_args['eval']:
-        model.eval(episodes=model_args['eval_episodes'],
-                   episode_length=model_args['eval_ep_length'],
-                   render=model_args['eval_render'])
+        r = model.eval(episodes=model_args['eval_episodes'],
+                       episode_length=model_args['eval_ep_length'],
+                       render=model_args['eval_render'])
+        r_range = env.reward_range
+        print("Evaluation: mean reward = " + str(r) + ", in " +
+              str(model_args['eval_episodes']) +
+              " episodes(length=" + str(model_args['eval_ep_length']) +
+              ", reward-range=" + str(r_range) + ")")
     env.close()

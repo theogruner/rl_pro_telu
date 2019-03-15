@@ -13,16 +13,16 @@ Installation quanser: https://git.ias.informatik.tu-darmstadt.de/quanser/clients
 
 Additionally [PyTorch](https://pytorch.org), [Numpy](https://www.scipy.org/scipylib/download.html), 
 [Tensorflow](https://www.tensorflow.org/install), 
-[TensorboardX](https://tensorboardx.readthedocs.io/en/latest/index.html) are needed.
+[TensorboardX](https://tensorboardx.readthedocs.io/en/latest/index.html) are required.
 
 ## Usage Examples
 ### Note
 The algorithms are intended for continuous gym environments !
 ### DDPG
- * **Usage with Ornstein-Uhlenbeck noise**
+ * **Usage with provided noises (Ornstein Uhlenbeck, Adaptive Parameter)**
 
-    If you want to use DDPG with our suggested Ornstein-Uhlenbeck noise 
-    you can simply do this via the _main_ddpg.py_
+    If you want to use DDPG with our pre-implemented noises
+    you can simply do this via the _main_ddpg.py_ file.
         
     * Training on the Qube-v0 environment with default hyperparameters and 
     saving the model as _'furuta_model.pt'_ (saves by default as _ddpg_model.pt_).
