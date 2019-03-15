@@ -16,7 +16,7 @@ class MPO(object):
     """
     Maximum A Posteriori Policy Optimization (MPO)
 
-    :param env: (Gym Environment) gym environment to learn from
+    :param env: (Gym Environment) gym environment to learn on
     :param dual_constraint: (float) hard constraint of the dual formulation in the E-step
     :param mean_constraint: (float) hard constraint of the mean in the M-step
     :param var_constraint: (float) hard constraint of the covariance in the M-step
@@ -24,6 +24,7 @@ class MPO(object):
     :param alpha: (float) scaling factor of the lagrangian multiplier in the M-step
     :param episodes: (int) number of training (evaluation) episodes
     :param episode_length: (int) step size of one episode
+    :param lagrange_it: (int) number of optimization steps of the Lagrangian
     :param mb_size: (int) size of the sampled mini-batch
     :param sample_episodes: (int) number of sampling episodes
     :param add_act: (int) number of additional actions
@@ -36,8 +37,8 @@ class MPO(object):
     :param save_path: (str) path for saving and loading a model
     """
     def __init__(self, env, dual_constraint=0.1, mean_constraint=0.1, var_constraint=1e-4,
-                 learning_rate=0.99, alpha=1e4, episodes=int(200),
-                 episode_length=3000, mb_size=64, rerun_mb=5, sample_episodes=1, add_act=64,
+                 learning_rate=0.99, alpha=1e4, episodes=int(200), episode_length=3000,
+                 lagrange_it=5, mb_size=64, rerun_mb=5, sample_episodes=1, add_act=64,
                  actor_layers=None, critic_layers=None,
                  log=True, log_dir=None, render=False, save=True, save_path="mpo_model.pt"):
         # initialize env
@@ -51,6 +52,7 @@ class MPO(object):
         self.γ = learning_rate  # learning rate
         self.episodes = episodes
         self.episode_length = episode_length
+        self.lagrange_it = lagrange_it
         self.mb_size = mb_size
         self.rerun_mb = rerun_mb
         self.M = add_act
@@ -95,10 +97,10 @@ class MPO(object):
     def _sample_trajectory(self, episodes, episode_length, render):
         """
         Samples a trajectory which serves as a batch
-        :param episodes: number of episodes to be sampled
-        :param episode_length: length of a single episode
-        :param render: flag if steps should be rendered
-        :return: states, actions, rewards, next_states: batch of states, actions, rewards and next-states
+        :param episodes: (int) number of episodes to be sampled
+        :param episode_length: (int) length of a single episode
+        :param render: (bool) flag if steps should be rendered
+        :return: [States], [Action], [Reward], [State]: batch of states, actions, rewards and next-states
         """
         states = []
         rewards = []
@@ -130,20 +132,21 @@ class MPO(object):
         next_states = np.array(next_states)
         return states, actions, rewards, next_states, mean_reward
 
-    def _critic_update(self, rewards, mean_q, mean_next_q):
+    def _critic_update(self, states, rewards, actions, mean_next_q):
         """
         Updates the critics
-        :param states: mini-batch of states
-        :param actions: mini-batch of actions
-        :param rewards: mini-batch of rewards
-        :param next_states: mini-batch of next-states
-        :return:
+        :param states: ([State]) mini-batch of states
+        :param actions: ([Action]) mini-batch of actions
+        :param rewards: ([Reward]) mini-batch of rewards
+        :param mean_next_q: ([State]) target Q values
+        :return: (float) q-loss
         """
         # TODO: maybe use retrace Q-algorithm
         rewards = torch.from_numpy(rewards).float()
         y = rewards + self.γ * mean_next_q
         self.critic_optimizer.zero_grad()
-        loss_critic = self.mse_loss(y, mean_q)
+        target = self.critic(states, actions)
+        loss_critic = self.mse_loss(y, target)
         loss_critic.backward()
         self.critic_optimizer.step()
         return loss_critic.item()
@@ -151,11 +154,11 @@ class MPO(object):
     def _calculate_gaussian_kl(self, actor_mean, target_mean, actor_cholesky, target_cholesky):
         """
         calculates the KL between the old and new policy assuming a gaussian distribution
-        :param actor_mean: mean of the actor
-        :param target_mean: mean of the target actor
-        :param actor_cholesky: cholesky matrix of the actor covariance
-        :param target_cholesky: choles matrix of the target actor covariance
-        :return: C_μ, C_Σ: mean and covariance terms of the KL
+        :param actor_mean: ([float]) mean of the actor
+        :param target_mean: ([float]) mean of the target actor
+        :param actor_cholesky: ([[float]]) cholesky matrix of the actor covariance
+        :param target_cholesky: ([[float]]) cholesky matrix of the target actor covariance
+        :return: C_μ, C_Σ: ([float],[[float]])mean and covariance terms of the KL
         """
         inner_Σ = []
         inner_μ = []
@@ -179,7 +182,6 @@ class MPO(object):
     def _update_param(self):
         """
         Sets target parameters to trained parameter
-        :return:
         """
         # Update policy parameters
         for target_param, param in zip(self.target_actor.parameters(), self.actor.parameters()):
@@ -203,6 +205,7 @@ class MPO(object):
         :param log: (boolean) saves log if True
         :param log_dir: (str) directory in which log is saved
         """
+        # initialize flags and params
         rend = render if render is not None else self.render
         sf = save if save is not None else self.save
         sf_path = save_path if save_path is not None else self.save_path
@@ -210,16 +213,21 @@ class MPO(object):
         it = episode_length if episode_length is not None else self.episode_length
         L = sample_episodes if sample_episodes is not None else self.sample_episodes
         rerun = rerun_mb if rerun_mb is not None else self.rerun_mb
+
+        # initialize logging
         is_log = log if log is not None else self.log
         log_d = log_dir if log_dir is not None else self.log_dir
         if is_log:
             writer = SummaryWriter() if log_d is None else SummaryWriter(log_d)
 
+        # start training
         for episode in range(self.episode, ep):
+
             # Update replay buffer
             states, actions, rewards, next_states, mean_reward = self._sample_trajectory(L, it, rend)
             mean_q_loss = 0
             mean_lagrange = 0
+
             # Find better policy by gradient descent
             for _ in range(rerun):
                 for indices in BatchSampler(SubsetRandomSampler(range(it)), self.mb_size, False):
@@ -257,8 +265,9 @@ class MPO(object):
 
                     # Update Q-function
                     q_loss = self._critic_update(
+                        states=state_batch,
                         rewards=reward_batch,
-                        mean_q=mean_q,
+                        actions=action_batch,
                         mean_next_q=mean_next_q
                     )
                     mean_q_loss += q_loss   # TODO: can be removed
@@ -290,7 +299,7 @@ class MPO(object):
 
                     # M-step
                     # update policy based on lagrangian
-                    for _ in range(1):
+                    for _ in range(self.lagrange_it):
                         μ, A = self.actor.forward(torch.tensor(state_batch).float())
                         π = MultivariateNormal(μ, scale_tril=A)
 
@@ -338,52 +347,52 @@ class MPO(object):
                 "\n η_μ:\t", self.η_μ,
                 "\n η_Σ:\t", self.η_Σ,
             )
+
+            # saving and logging
             if sf is True:
                 self.save_model(episode=episode, path=sf_path)
             if is_log:
-                writer.add_scalar('data/mean_reward', mean_reward / it / 5, episode * it)
-                writer.add_scalar('data/mean_lagrangeloss', mean_lagrange / it / 5 / 5, episode * it)
-                writer.add_scalar('data/mean_qloss', mean_q_loss / it / 5, episode * it)
+                number_mb = int(self.it / self.mb_size) + 1
+                reward_target = self.eval(10, it, render=False)
+                writer.add_scalar('target/mean_rew_10_ep', reward_target,
+                                  episode + 1)
+                writer.add_scalar('data/mean_reward', mean_reward, episode + 1)
+                writer.add_scalar('data/mean_lagrangeloss', mean_lagrange
+                                  / self.lagrange_it/ self.rerun_mb/ number_mb, episode + 1)
+                writer.add_scalar('data/mean_qloss', mean_q_loss / self.rerun_mb / number_mb, episode + 1)
+
+        # end training
+        if is_log:
+            writer.close()
 
     def eval(self, episodes, episode_length, render=True):
         """
-        Evaluates the learned model
-        :param episodes: (int) number of evaluation episodes
-        :param episode_length: (int) step size of one episode
-        :param render: (boolean) renders the simulation if True
+        method for evaluating current model (mean reward for a given number of
+        episodes and episode length)
+        :param episodes: (int) number of episodes for the evaluation
+        :param episode_length: (int) length of a single episode
+        :param render: (bool) flag if to render while evaluating
+        :return: (float) meaned reward achieved in the episodes
         """
-        self.actor.eval()
-        reward = []
-        mean_reward = []
-        mean_q = []
+
+        summed_rewards = 0
         for episode in range(episodes):
+            reward = 0
             observation = self.env.reset()
-            reward_e = []
-            mean_reward_e = []
-            mean_q_e = []
             for step in range(episode_length):
-                state = torch.tensor(observation).float()
-                action = self.actor.eval_step(state).numpy()
-                # obs = torch.tensor(observation).float()
-                # q = self.critic.eval(state, action).item()
-                # mean_q_e.append(q)
+                action = self.target_actor.eval_step(observation)
                 new_observation, rew, done, _ = self.env.step(action)
+                reward += rew
                 if render:
                     self.env.render()
-                reward_e.append(rew.item())
-                mean_reward_e.append(np.mean(reward_e).item())
-                observation = new_observation
-                if done:
-                    break
-            reward.append(reward_e)
-            mean_reward.append(mean_reward_e)
-            mean_q.append(mean_q_e)
+                observation = new_observation if not done else self.env.reset()
 
-        return reward, mean_reward, mean_q
+            summed_rewards += reward
+        return summed_rewards/episodes
 
     def load_model(self, path=None):
         """
-        Loading the model
+        loads a model from a given path
         :param path: (str) file path (.pt file)
         """
         load_path = path if path is not None else self.save_path
@@ -402,7 +411,7 @@ class MPO(object):
 
     def save_model(self, episode=0, path=None):
         """
-        Saving the model
+        saves the model
         :param episode: (int) number of learned episodes
         :param path: (str) file path (.pt file)
         """

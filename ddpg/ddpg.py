@@ -299,7 +299,7 @@ class DDPG(object):
                                   episode+1)
                 writer.add_scalar('data/mean_qloss_per_ep', qloss_per_ep / it,
                                   episode+1)
-                reward_target = self.eval(10, self.episode_length, render=False)
+                reward_target = self.eval(10, it, render=False)
                 writer.add_scalar('target/mean_rew_10_ep', reward_target,
                                   episode+1)
 

@@ -7,7 +7,7 @@ from torch.distributions import MultivariateNormal
 class Actor(nn.Module):
     """
     Policy network
-    :param env: gym environment for state and action shapes
+    :param env: (gym Environment) environment actor is operating on
     :param layer1: (int) size of the first hidden layer (default = 100)
     :param layer2: (int) size of the first hidden layer (default = 100)
     """
@@ -26,10 +26,9 @@ class Actor(nn.Module):
 
     def forward(self, states):
         """
-        Goes forward through the network
+        forwards input through the network
         :param states: ([State]) a (batch of) state(s) of the environment
-        :return: ([float])([float]) output of the network(= mean and
-                 cholesky factorization chosen by policy at given state)
+        :return: ([float])([float]) mean and cholesky factorization chosen by policy at given state
         """
         x = F.relu(self.lin1(states))
         x = F.relu(self.lin2(x))
@@ -48,7 +47,7 @@ class Actor(nn.Module):
 
     def action(self, state):
         """
-        Approximates an action by going forward through the network
+        approximates an action by going forward through the network
         :param state: (State) a state of the environment
         :return: (float) an action of the action space
         """
@@ -60,7 +59,7 @@ class Actor(nn.Module):
 
     def eval_step(self, state):
         """
-        Approximates an action based on the mean output of the network
+        approximates an action based on the mean output of the network
         :param state: (State) a state of  the environment
         :return: (float) an action of the action space
         """
@@ -70,7 +69,7 @@ class Actor(nn.Module):
 
     def to_cholesky_matrix(self, cholesky_vector):
         """
-        Lower triangular matrix
+        computes cholesky matrix corresponding to a vector
         :param cholesky_vector: ([float]) vector with n items
         :return: ([[float]]) Square Matrix containing the entries of the
                  vector
