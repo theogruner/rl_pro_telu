@@ -4,16 +4,24 @@ Policy Optimization ([MPO](https://arxiv.org/abs/1806.06920)) Reinforcement Lear
 control on [OpenAI gym](https://github.com/openai/gym) environments.
 
 ## Prerequisites
-To use the Algorithms will require python3 (>=3.6.5), OpenAI gym and the 
-Quanser environments.
+To use the Algorithms will require python3 (>=3.6.5).
 
-Installation gym: https://github.com/openai/gym
+* This should install all dependencies and the packages (cloning -> into a directory of choice):
+    ```bash
+    git clone https://github.com/theogruner/rl_pro_telu
+    cd rl_pro_telu
+    pip install -e .
+    ``` 
+ 
+* Or they can be installed manually
 
-Installation quanser: https://git.ias.informatik.tu-darmstadt.de/quanser/clients/tree/master
+    Installation gym: https://github.com/openai/gym
 
-Additionally [PyTorch](https://pytorch.org), [Numpy](https://www.scipy.org/scipylib/download.html), 
-[Tensorflow](https://www.tensorflow.org/install), 
-[TensorboardX](https://tensorboardx.readthedocs.io/en/latest/index.html) are required.
+    Installation quanser: https://git.ias.informatik.tu-darmstadt.de/quanser/clients/tree/master
+
+    Additionally [PyTorch](https://pytorch.org), [Numpy](https://www.scipy.org/scipylib/download.html), 
+    [Tensorflow](https://www.tensorflow.org/install), 
+    [TensorboardX](https://tensorboardx.readthedocs.io/en/latest/index.html) are required.
 
 ## Usage Examples
 ### Note
@@ -70,7 +78,7 @@ The algorithms are intended for continuous gym environments !
  
    To use a self defined noise you will need to write a script by yourself.
    
-   * Make sure the script is the same directory as the _ddpg_ package (has acces to the required package).
+   * Make sure the script is the same directory as the _ddpg_ package (only if you didn't install them with [PyPI](https://pypi.org)).
    * The noise should extend the _Noise_ class in _noise.py_ (contain a _reset_ and _iteration_ function) 
    * Following examples cover previous examples functionality
    
