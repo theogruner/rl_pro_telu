@@ -291,7 +291,7 @@ class MPO(object):
                     exp_Q = torch.tensor(additional_target_q) / self.η
                     baseline = torch.max(exp_Q, 0)[0]
                     exp_Q = torch.exp(exp_Q - baseline)
-                    normalization = torch.sum(exp_Q, 0)
+                    normalization = torch.mean(exp_Q, 0)
                     action_q = additional_action * exp_Q / normalization
                     action_q = np.clip(action_q, a_min=-self.action_range,
                                 a_max=self.action_range)
